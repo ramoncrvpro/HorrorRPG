@@ -4072,6 +4072,7 @@ MonoBehaviour:
   tabsParent: {fileID: 2274254619315077135}
   tabPrefab: {fileID: 2164441430414296806, guid: d4fc7abdf0edf3746a13218994ce3af9, type: 3}
   itemSlotPrefab: {fileID: 7758854862763927921}
+  defaultWeapon: {fileID: 0}
   maxSlots: 9
   itemAddDelay: 0.25
   promptDisplayDuration: 2

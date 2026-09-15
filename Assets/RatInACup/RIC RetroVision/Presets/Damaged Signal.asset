@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 12af1b858f63497458e59487c12e0409, type: 3}
+  m_Name: Damaged Signal
+  m_EditorClassIdentifier: RatInACup.RICRetroVision.Runtime::RatInACup.RICRetroVision.RICRetroVisionPreset
+  settings:
+    timeScale: 1
+    randomSeed: 42.6
+    chromaAmount: 0.012
+    redBleedBoost: 1.5
+    noiseIntensity: 0.35
+    noiseBandFrequency: 220
+    noiseSpeed: 12
+    noiseBandCoverage: 0.3
+    scanlineDensity: 700
+    scanlineIntensity: 0.48
+    scanlineFlickerSpeed: 12
+    scanlineFlickerAmount: 0.18
+    jitterAmount: 0.025
+    jitterLineGroupSize: 4
+    jitterSpeed: 18
+    twitchProbability: 0.2
+    twitchAmount: 0.03
+    twitchSpeed: 6
+    verticalJitterAmount: 0.01
+    verticalJitterSpeed: 4
+    desaturation: 0.25
+    contrastCrush: 0.3
+    limitColorPalette: 1
+    colorLevelsPerChannel: 3
+    pixelation: 2

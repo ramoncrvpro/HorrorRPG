@@ -26,7 +26,8 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
   - {fileID: 7833122117494664109}
-  m_RendererFeatureMap: ad6b866f10d7b46c
+  - {fileID: 3368408108713151773}
+  m_RendererFeatureMap: ad6b866f10d7b46c1d8d640a54fdbe2e
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -52,6 +53,47 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+--- !u!114 &3368408108713151773
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 245fe2cb93875c14fa4700f40f4fe2b5, type: 3}
+  m_Name: VHSRendererFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  shader: {fileID: 4800000, guid: de4f6053d67fd5b479361f832cd84f3b, type: 3}
+  Settings:
+    timeScale: 1
+    randomSeed: 13.37
+    chromaAmount: 0.001
+    redBleedBoost: 1
+    noiseIntensity: 0
+    noiseBandFrequency: 160
+    noiseSpeed: 5
+    noiseBandCoverage: 0.15
+    scanlineDensity: 5
+    scanlineIntensity: 0.1
+    scanlineFlickerSpeed: 0
+    scanlineFlickerAmount: 0
+    jitterAmount: 0.0005
+    jitterLineGroupSize: 1
+    jitterSpeed: 0
+    twitchProbability: 0
+    twitchAmount: 0
+    twitchSpeed: 2
+    verticalJitterAmount: 0
+    verticalJitterSpeed: 1.5
+    desaturation: 0
+    contrastCrush: 0
+    limitColorPalette: 0
+    colorLevelsPerChannel: 128
+    pixelation: 1
+  preset: {fileID: 11400000, guid: 23fd89cede6058d4fa1aa3e0eba9125e, type: 2}
 --- !u!114 &7833122117494664109
 MonoBehaviour:
   m_ObjectHideFlags: 0
