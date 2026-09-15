@@ -1,3 +1,13 @@
+namespace HorrorRPG.Dialogue
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using System;
 using UnityEngine;
 
@@ -38,30 +48,17 @@ public class ConfirmationMenu : MonoBehaviour
         }
     }
 
-    public void HandleNavigation()
+    public void HandleNavigation(Vector2 navigation)
     {
-        bool moveDown = Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S);
-        bool moveUp = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W);
-
-        if (moveDown)
-        {
-            currentSelectedIndex = (currentSelectedIndex + 1) % buttons.Length;
-            SelectButton(currentSelectedIndex);
-        }
-        else if (moveUp)
+        if (buttons == null || buttons.Length == 0 || navigation.sqrMagnitude < 0.25f) return;
+        if (Mathf.Abs(navigation.y) <= Mathf.Abs(navigation.x)) return;
+        if (navigation.y < 0f) currentSelectedIndex = (currentSelectedIndex + 1) % buttons.Length;
+        else
         {
             currentSelectedIndex--;
-            if (currentSelectedIndex < 0)
-            {
-                currentSelectedIndex = buttons.Length - 1;
-            }
-            SelectButton(currentSelectedIndex);
+            if (currentSelectedIndex < 0) currentSelectedIndex = buttons.Length - 1;
         }
-
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.E))
-        {
-            ExecuteCurrentButton();
-        }
+        SelectButton(currentSelectedIndex);
     }
 
     private void SelectButton(int index)
@@ -78,15 +75,13 @@ public class ConfirmationMenu : MonoBehaviour
         currentlySelectedButton.SetSelected(true);
     }
 
+    public void ExecuteCurrentSelection() => ExecuteCurrentButton();
+
     private void ExecuteCurrentButton()
     {
-        if (currentlySelectedButton == confirmButton)
-        {
-            onConfirm?.Invoke();
-        }
-        else if (currentlySelectedButton == cancelButton)
-        {
-            onCancel?.Invoke();
-        }
+        if (currentlySelectedButton == confirmButton) onConfirm?.Invoke();
+        else if (currentlySelectedButton == cancelButton) onCancel?.Invoke();
     }
+}
+
 }

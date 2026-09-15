@@ -1,3 +1,9 @@
+namespace HorrorRPG.Editor
+{
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+
+
 using UnityEditor;
 using UnityEngine;
 using System.Collections.Generic;
@@ -404,4 +410,7 @@ public class ItemDatabaseWindow : EditorWindow
         
         return items;
     }
+}
+
+
 }

@@ -1,3 +1,13 @@
+namespace HorrorRPG.Dialogue
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "New Dialogue", menuName = "Dialogue/Dialogue Data")]
@@ -12,4 +22,7 @@ public class DialogueData : ScriptableObject
 
     [Header("Confirmation Settings")]
     public bool requiresConfirmation = false;
+}
+
+
 }

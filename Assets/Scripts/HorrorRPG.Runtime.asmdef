@@ -1,0 +1,19 @@
+{
+  "name": "HorrorRPG.Runtime",
+  "rootNamespace": "HorrorRPG",
+  "references": [
+    "Unity.InputSystem",
+    "Unity.UGUI",
+    "Unity.TextMeshPro",
+    "LeanTween"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

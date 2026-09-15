@@ -1,3 +1,15 @@
+namespace HorrorRPG.Battle
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+using HorrorRPG.Player;
+
+
+
 using UnityEngine;
 using System.Collections;
 using UnityEngine.SceneManagement;
@@ -26,7 +38,6 @@ public class BattleManager : MonoBehaviour
     [SerializeField] private EnemyData currentEnemyData;
 
     [Header("Battle Delays")]
-    [SerializeField] private float battleStartDelay = 1f;
     [SerializeField] private float enemyDeathDelay = 1f;
 
     private bool isInBattle = false;
@@ -36,6 +47,7 @@ public class BattleManager : MonoBehaviour
     private int damageBuffValue = 0;
     private bool hasDamageBuff = false;
     private float markerSpeedModifier = 1f;
+    private GameInputReader inputReader;
 
     public EnemyData CurrentEnemyData => currentEnemyData;
     public int CurrentEnemyHealth => currentEnemyHealth;
@@ -52,6 +64,8 @@ public class BattleManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+
+        inputReader = FindFirstObjectByType<GameInputReader>();
     }
 
     public void StartBattle(MeshRenderer sourceEnemyRenderer, EnemyData enemyData)
@@ -104,6 +118,11 @@ public class BattleManager : MonoBehaviour
         }
 
         battleArena.SetActive(true);
+        if (inputReader == null)
+        {
+            inputReader = FindFirstObjectByType<GameInputReader>();
+        }
+        inputReader?.SetContext(InputContext.Battle);
 
         if (enemyAnimationController != null)
         {
@@ -317,7 +336,12 @@ public class BattleManager : MonoBehaviour
         }
 
         yield return new WaitForSeconds(0.35f);
-        
+
+        if (inputReader == null)
+        {
+            inputReader = FindFirstObjectByType<GameInputReader>();
+        }
+        inputReader?.SetContext(InputContext.Gameplay);
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
@@ -330,6 +354,12 @@ public class BattleManager : MonoBehaviour
         isProcessingTurn = false;
 
         battleArena.SetActive(false);
+
+        if (inputReader == null)
+        {
+            inputReader = FindFirstObjectByType<GameInputReader>();
+        }
+        inputReader?.SetContext(InputContext.Gameplay);
 
         PlayerControlManager.Instance.UnlockControl(CONTROL_LOCK_ID);
 
@@ -418,4 +448,7 @@ public class BattleManager : MonoBehaviour
             BattleUIManager.Instance.OpenMainMenu();
         }
     }
+}
+
+
 }

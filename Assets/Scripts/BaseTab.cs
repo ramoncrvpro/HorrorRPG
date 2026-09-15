@@ -1,3 +1,6 @@
+namespace HorrorRPG.Presentation
+{
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -30,4 +33,7 @@ public abstract class BaseTab : MonoBehaviour
             tabImage.enabled = !isSelected;
         }
     }
+}
+
+
 }

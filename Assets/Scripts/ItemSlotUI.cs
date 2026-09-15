@@ -1,3 +1,13 @@
+namespace HorrorRPG.Inventory
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -118,4 +128,7 @@ public class ItemSlotUI : MonoBehaviour
     {
         return inventoryManager != null ? inventoryManager.GetSlotIndex(this) : -1;
     }
+}
+
+
 }

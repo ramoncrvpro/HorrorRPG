@@ -1,3 +1,13 @@
+namespace HorrorRPG.Battle
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 using System;
 
@@ -14,6 +24,7 @@ public class AttackTimingBar : MonoBehaviour
     private Action<AttackResult> onComplete;
     private float speedModifier = 1f;
     private float inputDelayTimer = 0f;
+    private GameInputReader inputReader;
     
     private void Awake()
     {
@@ -27,6 +38,31 @@ public class AttackTimingBar : MonoBehaviour
         }
     }
     
+    private void OnEnable()
+    {
+        inputReader = FindFirstObjectByType<GameInputReader>();
+        if (inputReader != null)
+        {
+            inputReader.TimingConfirmPerformed += HandleTimingConfirm;
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (inputReader != null)
+        {
+            inputReader.TimingConfirmPerformed -= HandleTimingConfirm;
+        }
+    }
+
+    private void HandleTimingConfirm()
+    {
+        if (isActive && inputDelayTimer <= 0f)
+        {
+            EvaluateAndComplete();
+        }
+    }
+
     public void StartTiming(WeaponData weapon, Action<AttackResult> callback)
     {
         currentWeapon = weapon;
@@ -81,10 +117,11 @@ public class AttackTimingBar : MonoBehaviour
             AttackTimingUI.Instance.UpdateMarkerPosition(currentPosition);
         }
         
-        if (inputDelayTimer <= 0f && Input.GetKeyDown(KeyCode.E))
+        if (inputDelayTimer <= 0f)
         {
-            EvaluateAndComplete();
+            inputDelayTimer = 0f;
         }
+
     }
     
     private void EvaluateAndComplete()
@@ -112,4 +149,7 @@ public class AttackTimingBar : MonoBehaviour
     {
         return isActive;
     }
+}
+
+
 }

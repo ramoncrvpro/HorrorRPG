@@ -1,3 +1,13 @@
+namespace HorrorRPG.Player
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -45,4 +55,7 @@ public class PlayerTriggerZone : MonoBehaviour
 
         return false;
     }
+}
+
+
 }

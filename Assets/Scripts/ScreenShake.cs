@@ -1,3 +1,13 @@
+namespace HorrorRPG.Presentation
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 using System.Collections;
 
@@ -121,4 +131,7 @@ public class ScreenShake : MonoBehaviour
         transform.localPosition = originalPosition;
         transform.localRotation = originalRotation;
     }
+}
+
+
 }

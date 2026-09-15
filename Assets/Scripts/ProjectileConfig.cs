@@ -1,3 +1,13 @@
+namespace HorrorRPG.Battle
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "New Projectile Config", menuName = "Battle/Projectile Config")]
@@ -15,4 +25,7 @@ public class ProjectileConfig : ScriptableObject
     
     [Header("Visual")]
     public Material projectileMaterial;
+}
+
+
 }

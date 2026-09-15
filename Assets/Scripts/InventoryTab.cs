@@ -1,3 +1,12 @@
+namespace HorrorRPG.Inventory
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
 using UnityEngine;
 
 public class InventoryTab : BaseTab
@@ -15,4 +24,7 @@ public class InventoryTab : BaseTab
     {
         return category;
     }
+}
+
+
 }

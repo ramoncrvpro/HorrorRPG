@@ -1,126 +1,54 @@
+namespace HorrorRPG.Player
+{
+using HorrorRPG.Input;
+using HorrorRPG.Interaction;
 using UnityEngine;
 
 public class PlayerInteraction : MonoBehaviour
 {
-    [Header("Interaction Settings")]
     [SerializeField] private float interactionRange = 2f;
-    [SerializeField] private LayerMask interactableLayer = ~0;
-    [SerializeField] private KeyCode interactionKey = KeyCode.E;
-    
-    [Header("Raycast Settings")]
+    [SerializeField] private LayerMask interactableLayer;
     [SerializeField] private Transform raycastOrigin;
-    
+    [SerializeField] private Camera playerCamera;
+    [SerializeField] private GameInputReader inputReader;
+    [SerializeField] private InteractionPromptUI promptUI;
     private IInteractable currentInteractable;
-    private Camera playerCamera;
+    private string currentPrompt;
     private bool interactionEnabled = true;
-    private bool isShowingPrompt = false;
 
-    private void Start()
+    private void Awake()
     {
-        playerCamera = Camera.main;
-        
-        if (raycastOrigin == null)
-        {
-            raycastOrigin = playerCamera.transform;
-        }
+        if (inputReader == null) inputReader = FindFirstObjectByType<GameInputReader>();
+        if (promptUI == null) promptUI = FindFirstObjectByType<InteractionPromptUI>();
+        if (raycastOrigin == null) { Debug.LogError($"{nameof(PlayerInteraction)} requires a raycast origin on {name}.", this); enabled = false; }
     }
 
-    private void Update()
-    {
-        if (interactionEnabled)
-        {
-            CheckForInteractable();
-            HandleInteractionInput();
-        }
-        else
-        {
-            SetCurrentInteractable(null);
-        }
-    }
+    private void OnEnable() { if (inputReader != null) inputReader.InteractPerformed += HandleInteraction; }
+    private void OnDisable() { if (inputReader != null) inputReader.InteractPerformed -= HandleInteraction; HideInteractionPrompt(); }
+    private void Update() { if (interactionEnabled) CheckForInteractable(); else SetCurrentInteractable(null); }
 
     private void CheckForInteractable()
     {
-        Ray ray = new Ray(raycastOrigin.position, raycastOrigin.forward);
-        
-        if (Physics.Raycast(ray, out RaycastHit hit, interactionRange, interactableLayer))
-        {
-            IInteractable interactable = hit.collider.GetComponent<IInteractable>();
-            
-            if (interactable != null && interactable.CanInteract())
-            {
-                SetCurrentInteractable(interactable);
-                return;
-            }
-        }
-        
-        SetCurrentInteractable(null);
+        if (raycastOrigin == null) { SetCurrentInteractable(null); return; }
+        IInteractable found = null;
+        if (Physics.Raycast(new Ray(raycastOrigin.position, raycastOrigin.forward), out RaycastHit hit, interactionRange, interactableLayer)) found = hit.collider.GetComponentInParent<IInteractable>();
+        if (found != null && !found.CanInteract()) found = null;
+        SetCurrentInteractable(found);
     }
 
-    private void HandleInteractionInput()
-    {
-        if (Input.GetKeyDown(interactionKey) && currentInteractable != null)
-        {
-            currentInteractable.Interact();
-        }
-    }
-
+    private void HandleInteraction() { if (interactionEnabled) currentInteractable?.Interact(); }
     private void SetCurrentInteractable(IInteractable interactable)
     {
-        if (currentInteractable != interactable)
-        {
-            currentInteractable = interactable;
-
-            if (currentInteractable != null)
-            {
-                ShowInteractionPrompt();
-            }
-            else
-            {
-                HideInteractionPrompt();
-            }
-        }
+        string prompt = interactable?.GetInteractionPrompt();
+        if (ReferenceEquals(currentInteractable, interactable) && currentPrompt == prompt) return;
+        currentInteractable = interactable;
+        currentPrompt = prompt;
+        if (currentInteractable == null) HideInteractionPrompt(); else promptUI?.ShowPrompt(currentPrompt);
     }
-
-    private void ShowInteractionPrompt()
-    {
-        if (InteractionPromptUI.Instance != null && !isShowingPrompt)
-        {
-            string promptMessage = currentInteractable?.GetInteractionPrompt();
-            InteractionPromptUI.Instance.ShowPrompt(promptMessage);
-            isShowingPrompt = true;
-        }
-    }
-
-    private void HideInteractionPrompt()
-    {
-        if (InteractionPromptUI.Instance != null && isShowingPrompt)
-        {
-            InteractionPromptUI.Instance.HidePrompt();
-            isShowingPrompt = false;
-        }
-    }
-
-    public IInteractable GetCurrentInteractable()
-    {
-        return currentInteractable;
-    }
-
-    public string GetInteractionPrompt()
-    {
-        return currentInteractable?.GetInteractionPrompt();
-    }
-
-    public void SetInteractionEnabled(bool enabled)
-    {
-        interactionEnabled = enabled;
-    }
-
-    private void OnDrawGizmos()
-    {
-        if (raycastOrigin != null)
-        {
-            Gizmos.color = currentInteractable != null ? Color.green : Color.red;
-            Gizmos.DrawRay(raycastOrigin.position, raycastOrigin.forward * interactionRange);
-        }
-    }
+    private void HideInteractionPrompt() { promptUI?.HidePrompt(); currentPrompt = null; }
+    public IInteractable GetCurrentInteractable() => currentInteractable;
+    public string GetInteractionPrompt() => currentPrompt;
+    public void SetInteractionEnabled(bool enabled) { interactionEnabled = enabled; if (!enabled) SetCurrentInteractable(null); }
+    private void OnDrawGizmosSelected() { if (raycastOrigin != null) Gizmos.DrawRay(raycastOrigin.position, raycastOrigin.forward * interactionRange); }
+}
 }

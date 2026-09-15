@@ -1,3 +1,15 @@
+namespace HorrorRPG.Battle
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+using HorrorRPG.Player;
+
+
+
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
@@ -125,4 +137,7 @@ public class BattlePlayerEffects : MonoBehaviour
         damageFlashImage.color = finalColor;
         damageFlashCoroutine = null;
     }
+}
+
+
 }

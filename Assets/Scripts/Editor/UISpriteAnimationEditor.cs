@@ -1,3 +1,8 @@
+namespace HorrorRPG.Editor
+{
+using HorrorRPG.Presentation;
+
+
 using UnityEditor;
 using UnityEngine;
 
@@ -43,4 +48,7 @@ public class UISpriteAnimationEditor : Editor
         }
         EditorGUILayout.EndVertical();
     }
+}
+
+
 }

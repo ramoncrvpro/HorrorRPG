@@ -1,3 +1,13 @@
+namespace HorrorRPG.Presentation
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 
 [RequireComponent(typeof(MeshRenderer))]
@@ -94,4 +104,7 @@ public class AutoTextureTiling : MonoBehaviour
             Destroy(instanceMaterial);
         }
     }
+}
+
+
 }

@@ -1,3 +1,15 @@
+namespace HorrorRPG.Dialogue
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+using HorrorRPG.Player;
+
+
+
 using System;
 using System.Collections;
 using UnityEngine;
@@ -17,11 +29,13 @@ public class DialogueSystem : MonoBehaviour
 
     [Header("Dialogue Settings")]
     [SerializeField] private bool stuckDialogue = false;
-    [SerializeField] private KeyCode skipKey = KeyCode.Space;
+    // Advance is provided by GameInputReader.
 
     [Header("Confirmation Settings")]
     [SerializeField] private GameObject confirmationBackground;
     [SerializeField] private ConfirmationMenu confirmationMenu;
+    [SerializeField] private GameInputReader inputReader;
+
 
     private const string CONTROL_LOCK_ID = "DialogueSystem";
     private const string CONFIRMATION_LOCK_ID = "DialogueConfirmation";
@@ -52,36 +66,61 @@ public class DialogueSystem : MonoBehaviour
         }
     }
 
+    private void OnEnable()
+    {
+        if (inputReader == null) inputReader = FindFirstObjectByType<GameInputReader>();
+        if (inputReader == null) return;
+        inputReader.AdvancePerformed += HandleAdvance;
+        inputReader.NavigatePerformed += HandleNavigation;
+        inputReader.SubmitPerformed += HandleSubmit;
+        inputReader.CancelPerformed += HandleCancel;
+    }
+
+    private void OnDisable()
+    {
+        if (inputReader == null) return;
+        inputReader.AdvancePerformed -= HandleAdvance;
+        inputReader.NavigatePerformed -= HandleNavigation;
+        inputReader.SubmitPerformed -= HandleSubmit;
+        inputReader.CancelPerformed -= HandleCancel;
+    }
+
+
+
     private void Start()
     {
-        if (dialogueBox != null)
-        {
-            dialogueBox.SetActive(false);
-        }
+        if (inputReader == null) inputReader = FindFirstObjectByType<GameInputReader>();
+        if (dialogueBox != null) dialogueBox.SetActive(false);
     }
 
-    private void Update()
+    private void HandleAdvance()
     {
-        if (isConfirmationMenuOpen && confirmationMenu != null)
+        if (!isDialogueActive || isConfirmationMenuOpen) return;
+        if (isTyping)
         {
-            confirmationMenu.HandleNavigation();
-            return;
+            StopTyping();
+            dialogueText.text = currentSentences[currentSentenceIndex];
+            isTyping = false;
         }
-
-        if (isDialogueActive && Input.GetKeyDown(skipKey))
-        {
-            if (isTyping)
-            {
-                StopTyping();
-                dialogueText.text = currentSentences[currentSentenceIndex];
-                isTyping = false;
-            }
-            else
-            {
-                DisplayNextSentence();
-            }
-        }
+        else DisplayNextSentence();
     }
+
+    private void HandleNavigation(Vector2 navigation)
+    {
+        if (isConfirmationMenuOpen) confirmationMenu?.HandleNavigation(navigation);
+    }
+
+    private void HandleSubmit()
+    {
+        if (isConfirmationMenuOpen) confirmationMenu?.ExecuteCurrentSelection();
+    }
+
+    private void HandleCancel()
+    {
+        if (isConfirmationMenuOpen) onCancelCallback?.Invoke();
+        else if (isDialogueActive) EndDialogue();
+    }
+
 
     public void StartDialogue(DialogueData dialogueData, bool? stuckOverride = null, bool? fastTextOverride = null)
     {
@@ -303,4 +342,7 @@ public class DialogueSystem : MonoBehaviour
         onConfirmCallback = null;
         onCancelCallback = null;
     }
+}
+
+
 }

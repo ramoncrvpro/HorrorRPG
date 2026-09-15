@@ -1,3 +1,14 @@
+namespace HorrorRPG.Inventory
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+using HorrorRPG.Player;
+
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -55,19 +66,13 @@ public class InventoryManager : MonoBehaviour
     private UIState inventoryState;
     private UIState discardMenuState;
     private int lastAddedQuantity;
+    [SerializeField] private GameInputReader inputReader;
+
 
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-            return;
-        }
-
+        if (inputReader == null) inputReader = FindFirstObjectByType<GameInputReader>();
+        Instance = this;
         if (inventoryCanvas != null)
         {
             inventoryCanvas.SetActive(false);
@@ -81,6 +86,25 @@ public class InventoryManager : MonoBehaviour
         InitializeTabs();
         FindOrCreateSlots();
     }
+    private void OnEnable()
+    {
+        if (inputReader == null) inputReader = FindFirstObjectByType<GameInputReader>();
+        if (inputReader == null) return;
+        inputReader.OpenInventoryPerformed += ToggleInventory;
+        inputReader.NavigatePerformed += HandleNavigation;
+        inputReader.SubmitPerformed += HandleSubmit;
+        inputReader.CancelPerformed += HandleCancel;
+    }
+    private void OnDisable()
+    {
+        if (inputReader == null) return;
+        inputReader.OpenInventoryPerformed -= ToggleInventory;
+        inputReader.NavigatePerformed -= HandleNavigation;
+        inputReader.SubmitPerformed -= HandleSubmit;
+        inputReader.CancelPerformed -= HandleCancel;
+    }
+
+
 
     private void Start()
     {
@@ -148,26 +172,35 @@ public class InventoryManager : MonoBehaviour
         UpdateTabsVisuals();
     }
 
-    private void Update()
+    private void HandleNavigation(Vector2 navigation)
     {
-        if (Input.GetKeyDown(KeyCode.Tab))
+        if (!isInventoryOpen) return;
+        if (isDiscardMenuOpen)
         {
-            ToggleInventory();
+            discardConfirmationMenu?.HandleNavigation(navigation);
+            return;
         }
-
-        if (isInventoryOpen)
-        {
-            if (isDiscardMenuOpen)
-            {
-                HandleDiscardMenuNavigation();
-            }
-            else
-            {
-                HandleTabNavigation();
-                HandleInventoryNavigation();
-            }
-        }
+        if (navigation.sqrMagnitude < 0.25f) return;
+        if (Mathf.Abs(navigation.x) > Mathf.Abs(navigation.y)) HandleTabNavigation(navigation.x > 0f);
+        else HandleInventoryNavigation(navigation.y < 0f);
     }
+
+    private void HandleSubmit()
+    {
+        if (!isInventoryOpen) return;
+        if (isDiscardMenuOpen) discardConfirmationMenu?.ExecuteCurrentSelection();
+        else OpenDiscardMenu();
+    }
+
+
+
+    private void HandleCancel()
+    {
+        if (!isInventoryOpen) return;
+        if (isDiscardMenuOpen) OnDiscardCancelled();
+        else CloseInventory();
+    }
+
 
     public void ToggleInventory()
     {
@@ -185,6 +218,7 @@ public class InventoryManager : MonoBehaviour
 
         if (isInventoryOpen)
         {
+            inputReader?.SetContext(InputContext.UI);
             currentTabIndex = 0;
             currentCategory = ItemCategory.Consumable;
             UpdateTabsVisuals();
@@ -221,6 +255,7 @@ public class InventoryManager : MonoBehaviour
             PlayerControlManager.Instance.UnlockControl(CONTROL_LOCK_ID);
         }
 
+        inputReader?.SetContext(InputContext.Gameplay);
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
@@ -435,35 +470,21 @@ public class InventoryManager : MonoBehaviour
         }
     }
 
-    private void HandleTabNavigation()
+    private void HandleTabNavigation(bool moveRight)
     {
-        bool moveRight = Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D);
-        bool moveLeft = Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A);
-
+        if (tabs.Count == 0) return;
         if (moveRight)
         {
-            currentTabIndex++;
-            if (currentTabIndex >= tabs.Count)
-            {
-                currentTabIndex = 0;
-            }
-            
-            currentCategory = tabs[currentTabIndex].GetCategory();
-            UpdateTabsVisuals();
-            RefreshInventoryUI();
+            currentTabIndex = (currentTabIndex + 1) % tabs.Count;
         }
-        else if (moveLeft)
+        else
         {
             currentTabIndex--;
-            if (currentTabIndex < 0)
-            {
-                currentTabIndex = tabs.Count - 1;
-            }
-            
-            currentCategory = tabs[currentTabIndex].GetCategory();
-            UpdateTabsVisuals();
-            RefreshInventoryUI();
+            if (currentTabIndex < 0) currentTabIndex = tabs.Count - 1;
         }
+        currentCategory = tabs[currentTabIndex].GetCategory();
+        UpdateTabsVisuals();
+        RefreshInventoryUI();
     }
 
     public void SelectSlot(ItemSlotUI selectedSlot)
@@ -497,50 +518,18 @@ public class InventoryManager : MonoBehaviour
         }
     }
 
-    private void HandleInventoryNavigation()
+    private void HandleInventoryNavigation(bool moveDown)
     {
         List<InventorySlot> filteredSlots = GetFilteredSlots();
-        
-        if (filteredSlots.Count == 0)
-        {
-            return;
-        }
-
-        bool moveDown = Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S);
-        bool moveUp = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W);
-
-        if (moveDown)
-        {
-            int nextIndex = currentSelectedIndex + 1;
-            if (nextIndex >= filteredSlots.Count)
-            {
-                nextIndex = 0;
-            }
-            SelectSlotByIndex(nextIndex);
-        }
-        else if (moveUp)
-        {
-            int previousIndex = currentSelectedIndex - 1;
-            if (previousIndex < 0)
-            {
-                previousIndex = filteredSlots.Count - 1;
-            }
-            SelectSlotByIndex(previousIndex);
-        }
-
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.E))
-        {
-            OpenDiscardMenu();
-        }
+        if (filteredSlots.Count == 0) return;
+        int nextIndex = moveDown ? currentSelectedIndex + 1 : currentSelectedIndex - 1;
+        if (nextIndex >= filteredSlots.Count) nextIndex = 0;
+        if (nextIndex < 0) nextIndex = filteredSlots.Count - 1;
+        SelectSlotByIndex(nextIndex);
     }
 
-    private void HandleDiscardMenuNavigation()
-    {
-        if (discardConfirmationMenu != null)
-        {
-            discardConfirmationMenu.HandleNavigation();
-        }
-    }
+    private void HandleDiscardMenuNavigation() { }
+
 
     private void OpenDiscardMenu()
     {
@@ -739,4 +728,7 @@ public class InventoryManager : MonoBehaviour
 
         return 0;
     }
+}
+
+
 }

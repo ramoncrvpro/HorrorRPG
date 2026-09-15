@@ -1,3 +1,9 @@
+namespace HorrorRPG.Editor
+{
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+
+
 using UnityEditor;
 using UnityEngine;
 
@@ -343,4 +349,7 @@ public class WeaponDataEditor : Editor
         
         return stats;
     }
+}
+
+
 }

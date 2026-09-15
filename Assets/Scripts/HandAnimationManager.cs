@@ -1,3 +1,13 @@
+namespace HorrorRPG.Player
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 
 public class HandAnimationManager : MonoBehaviour
@@ -159,4 +169,7 @@ public class HandAnimationManager : MonoBehaviour
 
         return false;
     }
+}
+
+
 }

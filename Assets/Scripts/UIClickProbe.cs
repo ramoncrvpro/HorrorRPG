@@ -1,6 +1,17 @@
+namespace HorrorRPG.Presentation
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public class UIClickProbe : MonoBehaviour
@@ -16,11 +27,11 @@ public class UIClickProbe : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetMouseButtonDown(0))
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
         {
             var data = new PointerEventData(eventSystem)
             {
-                position = Input.mousePosition
+                position = Mouse.current.position.ReadValue()
             };
 
             var results = new List<RaycastResult>();
@@ -40,4 +51,7 @@ public class UIClickProbe : MonoBehaviour
             }
         }
     }
+}
+
+
 }

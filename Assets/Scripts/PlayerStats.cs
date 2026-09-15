@@ -1,3 +1,6 @@
+namespace HorrorRPG.Player
+{
+
 using UnityEngine;
 
 public class PlayerStats : MonoBehaviour
@@ -46,4 +49,7 @@ public class PlayerStats : MonoBehaviour
     {
         currentHealth = maxHealth;
     }
+}
+
+
 }

@@ -1,3 +1,6 @@
+namespace HorrorRPG.Interaction
+{
+
 using UnityEngine;
 
 public interface IInteractable
@@ -7,4 +10,7 @@ public interface IInteractable
     string GetInteractionPrompt();
     
     bool CanInteract();
+}
+
+
 }

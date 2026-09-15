@@ -1,3 +1,13 @@
+namespace HorrorRPG.Presentation
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 
 public class SpriteSheetAnimator : MonoBehaviour
@@ -125,4 +135,7 @@ public class SpriteSheetAnimator : MonoBehaviour
         propertyBlock.SetFloat(HitEffectProperty, 0f);
         meshRenderer.SetPropertyBlock(propertyBlock);
     }
+}
+
+
 }

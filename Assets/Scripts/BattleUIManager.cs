@@ -1,3 +1,15 @@
+namespace HorrorRPG.Battle
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+using HorrorRPG.Player;
+
+
+
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -57,6 +69,32 @@ public class BattleUIManager : MonoBehaviour
     private int currentSelectedItemIndex = -1;
     private bool isItemsMenuOpen = false;
     private UIState itemsMenuState;
+    private GameInputReader inputReader;
+
+    private void OnEnable()
+    {
+        inputReader = FindFirstObjectByType<GameInputReader>();
+        if (inputReader == null)
+        {
+            return;
+        }
+
+        inputReader.BattleNavigatePerformed += HandleBattleNavigation;
+        inputReader.BattleSubmitPerformed += HandleBattleSubmit;
+        inputReader.BattleCancelPerformed += HandleBattleCancel;
+    }
+
+    private void OnDisable()
+    {
+        if (inputReader == null)
+        {
+            return;
+        }
+
+        inputReader.BattleNavigatePerformed -= HandleBattleNavigation;
+        inputReader.BattleSubmitPerformed -= HandleBattleSubmit;
+        inputReader.BattleCancelPerformed -= HandleBattleCancel;
+    }
 
     private void Awake()
     {
@@ -171,20 +209,59 @@ public class BattleUIManager : MonoBehaviour
         }
     }
 
-    private void Update()
+    private void HandleBattleNavigation(Vector2 navigation)
     {
+        if (navigation.sqrMagnitude < 0.25f)
+        {
+            return;
+        }
+
         if (isMainMenuOpen && !isAttackMenuOpen && !isItemsMenuOpen)
         {
-            HandleMainMenuNavigation();
+            HandleMainMenuNavigation(navigation.y < 0f);
         }
         else if (isAttackMenuOpen)
         {
-            HandleWeaponTabNavigation();
-            HandleWeaponListNavigation();
+            if (Mathf.Abs(navigation.x) > Mathf.Abs(navigation.y))
+            {
+                HandleWeaponTabNavigation(navigation.x > 0f);
+            }
+            else
+            {
+                HandleWeaponListNavigation(navigation.y < 0f);
+            }
         }
         else if (isItemsMenuOpen)
         {
-            HandleItemsListNavigation();
+            HandleItemsListNavigation(navigation.y < 0f);
+        }
+    }
+
+    private void HandleBattleSubmit()
+    {
+        if (isMainMenuOpen && !isAttackMenuOpen && !isItemsMenuOpen)
+        {
+            ExecuteMainMenuAction();
+        }
+        else if (isAttackMenuOpen)
+        {
+            OnWeaponSelected();
+        }
+        else if (isItemsMenuOpen)
+        {
+            OnItemSelected();
+        }
+    }
+
+    private void HandleBattleCancel()
+    {
+        if (isAttackMenuOpen)
+        {
+            OnAttackMenuBack();
+        }
+        else if (isItemsMenuOpen)
+        {
+            OnItemsMenuBack();
         }
     }
 
@@ -290,11 +367,8 @@ public class BattleUIManager : MonoBehaviour
         CloseMainMenu();
     }
 
-    private void HandleMainMenuNavigation()
+    private void HandleMainMenuNavigation(bool moveDown)
     {
-        bool moveDown = Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S);
-        bool moveUp = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W);
-
         if (moveDown)
         {
             int nextIndex = currentMainMenuIndex + 1;
@@ -304,7 +378,7 @@ public class BattleUIManager : MonoBehaviour
             }
             SelectMainMenuButton(nextIndex);
         }
-        else if (moveUp)
+        else
         {
             int previousIndex = currentMainMenuIndex - 1;
             if (previousIndex < 0)
@@ -312,11 +386,6 @@ public class BattleUIManager : MonoBehaviour
                 previousIndex = mainMenuButtons.Count - 1;
             }
             SelectMainMenuButton(previousIndex);
-        }
-
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.E))
-        {
-            ExecuteMainMenuAction();
         }
     }
 
@@ -416,11 +485,8 @@ public class BattleUIManager : MonoBehaviour
         }
     }
 
-    private void HandleWeaponTabNavigation()
+    private void HandleWeaponTabNavigation(bool moveRight)
     {
-        bool moveRight = Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D);
-        bool moveLeft = Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A);
-
         if (moveRight)
         {
             currentTabIndex++;
@@ -433,7 +499,7 @@ public class BattleUIManager : MonoBehaviour
             UpdateWeaponTabsVisuals();
             RefreshWeaponList();
         }
-        else if (moveLeft)
+        else
         {
             currentTabIndex--;
             if (currentTabIndex < 0)
@@ -577,7 +643,7 @@ public class BattleUIManager : MonoBehaviour
         return InventoryManager.Instance.GetItemQuantity(ammoType);
     }
 
-    private void HandleWeaponListNavigation()
+    private void HandleWeaponListNavigation(bool moveDown)
     {
         List<WeaponData> filteredWeapons = GetFilteredWeapons();
         
@@ -585,9 +651,6 @@ public class BattleUIManager : MonoBehaviour
         {
             return;
         }
-
-        bool moveDown = Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S);
-        bool moveUp = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W);
 
         if (moveDown)
         {
@@ -598,7 +661,7 @@ public class BattleUIManager : MonoBehaviour
             }
             SelectWeaponSlotByIndex(nextIndex);
         }
-        else if (moveUp)
+        else
         {
             int previousIndex = currentSelectedWeaponIndex - 1;
             if (previousIndex < 0)
@@ -606,11 +669,6 @@ public class BattleUIManager : MonoBehaviour
                 previousIndex = filteredWeapons.Count - 1;
             }
             SelectWeaponSlotByIndex(previousIndex);
-        }
-
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.E))
-        {
-            OnWeaponSelected();
         }
     }
 
@@ -766,7 +824,7 @@ public class BattleUIManager : MonoBehaviour
         }
     }
 
-    private void HandleItemsListNavigation()
+    private void HandleItemsListNavigation(bool moveDown)
     {
         List<ItemData> consumableItems = new List<ItemData>();
         
@@ -780,9 +838,6 @@ public class BattleUIManager : MonoBehaviour
             return;
         }
 
-        bool moveDown = Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S);
-        bool moveUp = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W);
-
         if (moveDown)
         {
             int nextIndex = currentSelectedItemIndex + 1;
@@ -792,7 +847,7 @@ public class BattleUIManager : MonoBehaviour
             }
             SelectItemSlotByIndex(nextIndex);
         }
-        else if (moveUp)
+        else
         {
             int previousIndex = currentSelectedItemIndex - 1;
             if (previousIndex < 0)
@@ -800,11 +855,6 @@ public class BattleUIManager : MonoBehaviour
                 previousIndex = consumableItems.Count - 1;
             }
             SelectItemSlotByIndex(previousIndex);
-        }
-
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.E))
-        {
-            OnItemSelected();
         }
     }
 
@@ -865,4 +915,7 @@ public class BattleUIManager : MonoBehaviour
             }
         }
     }
+}
+
+
 }

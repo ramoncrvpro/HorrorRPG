@@ -1,3 +1,13 @@
+namespace HorrorRPG.Presentation
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -24,4 +34,7 @@ public class UISpriteAnimation : ScriptableObject
 
         return sprites[index];
     }
+}
+
+
 }

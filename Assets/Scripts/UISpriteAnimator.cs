@@ -1,3 +1,13 @@
+namespace HorrorRPG.Presentation
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -5,7 +15,7 @@ using UnityEngine.UI;
 public class UISpriteAnimator : MonoBehaviour
 {
     [Header("Animation Settings")]
-    [SerializeField] private UISpriteAnimation animation;
+    [SerializeField] private new UISpriteAnimation animation;
     [SerializeField] private bool playOnAwake = true;
 
     private Image targetImage;
@@ -128,4 +138,7 @@ public class UISpriteAnimator : MonoBehaviour
             targetImage.sprite = sprite;
         }
     }
+}
+
+
 }

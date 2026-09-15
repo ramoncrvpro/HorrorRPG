@@ -1,3 +1,13 @@
+namespace HorrorRPG.Battle
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -36,4 +46,7 @@ public class EnemyData : ScriptableObject
         int randomIndex = Random.Range(0, validAttacks.Count);
         return validAttacks[randomIndex];
     }
+}
+
+
 }

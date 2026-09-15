@@ -1,89 +1,42 @@
+namespace HorrorRPG.Inventory
+{
+using HorrorRPG.Battle;
+
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>Scene adapter for the in-memory recent weapon order.</summary>
 public class RecentWeaponsManager : MonoBehaviour
 {
     public static RecentWeaponsManager Instance { get; private set; }
-
-    [Header("Database")]
     [SerializeField] private WeaponDatabase weaponDatabase;
-
-    private const string RECENT_WEAPONS_KEY = "RecentWeapons";
-    private const int MAX_RECENT_WEAPONS = 9;
-
-    private List<string> recentWeaponIDs = new List<string>();
+    private const int MaxRecentWeapons = 9;
+    private readonly List<string> recentWeaponIds = new List<string>(MaxRecentWeapons);
 
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            //DontDestroyOnLoad(gameObject);
-            LoadRecentWeapons();
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
     }
-
     public void AddRecentWeapon(WeaponData weapon)
     {
-        if (weapon == null)
-            return;
-
-        string weaponID = weapon.name;
-
-        recentWeaponIDs.Remove(weaponID);
-
-        recentWeaponIDs.Insert(0, weaponID);
-
-        if (recentWeaponIDs.Count > MAX_RECENT_WEAPONS)
-        {
-            recentWeaponIDs.RemoveAt(recentWeaponIDs.Count - 1);
-        }
-
-        SaveRecentWeapons();
+        if (weapon == null) return;
+        string weaponId = weapon.name;
+        recentWeaponIds.Remove(weaponId);
+        recentWeaponIds.Insert(0, weaponId);
+        if (recentWeaponIds.Count > MaxRecentWeapons) recentWeaponIds.RemoveAt(recentWeaponIds.Count - 1);
     }
-
     public List<WeaponData> GetRecentWeapons()
     {
-        List<WeaponData> weapons = new List<WeaponData>();
-        
-        if (weaponDatabase == null)
+        var weapons = new List<WeaponData>();
+        if (weaponDatabase == null) return weapons;
+        foreach (string weaponId in recentWeaponIds)
         {
-            Debug.LogWarning("RecentWeaponsManager: WeaponDatabase não está atribuído!");
-            return weapons;
+            WeaponData weapon = weaponDatabase.GetWeaponByName(weaponId);
+            if (weapon != null) weapons.Add(weapon);
         }
-        
-        foreach (string weaponID in recentWeaponIDs)
-        {
-            WeaponData weapon = weaponDatabase.GetWeaponByName(weaponID);
-            if (weapon != null)
-            {
-                weapons.Add(weapon);
-            }
-        }
-
         return weapons;
     }
-
-    private void SaveRecentWeapons()
-    {
-        string serializedData = string.Join(",", recentWeaponIDs);
-        PlayerPrefs.SetString(RECENT_WEAPONS_KEY, serializedData);
-        PlayerPrefs.Save();
-    }
-
-    private void LoadRecentWeapons()
-    {
-        if (PlayerPrefs.HasKey(RECENT_WEAPONS_KEY))
-        {
-            string serializedData = PlayerPrefs.GetString(RECENT_WEAPONS_KEY);
-            if (!string.IsNullOrEmpty(serializedData))
-            {
-                recentWeaponIDs = new List<string>(serializedData.Split(','));
-            }
-        }
-    }
+    private void OnDestroy() { if (Instance == this) Instance = null; }
+}
 }

@@ -1,5 +1,15 @@
+namespace HorrorRPG.Interaction
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
-using UnityEngine.SceneManagement;
+
 
 public class SceneLoadInteraction : MonoBehaviour, IInteractable
 {
@@ -36,6 +46,14 @@ public class SceneLoadInteraction : MonoBehaviour, IInteractable
             return;
         }
 
-        SceneManager.LoadScene(sceneToLoad);
+        if (GameBootstrap.Instance == null || GameBootstrap.Instance.Context == null)
+        {
+            Debug.LogError($"SceneFlow is unavailable for destination '{sceneToLoad}'.", this);
+            return;
+        }
+        GameBootstrap.Instance.Context.SceneFlow.Load(sceneToLoad);
     }
+}
+
+
 }

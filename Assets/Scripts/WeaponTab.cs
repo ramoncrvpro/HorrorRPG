@@ -1,3 +1,13 @@
+namespace HorrorRPG.Inventory
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 
 public enum WeaponCategory
@@ -22,4 +32,7 @@ public class WeaponTab : BaseTab
     {
         return category;
     }
+}
+
+
 }

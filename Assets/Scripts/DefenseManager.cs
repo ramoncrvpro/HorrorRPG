@@ -1,3 +1,15 @@
+namespace HorrorRPG.Battle
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+using HorrorRPG.Player;
+
+
+
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -9,13 +21,10 @@ public class DefenseManager : MonoBehaviour
     [SerializeField] private float globalCooldown = 1.5f;
 
     [Header("Input Settings")]
-    [SerializeField] private KeyCode leftDefenseKey = KeyCode.LeftArrow;
-    [SerializeField] private KeyCode upDefenseKey = KeyCode.UpArrow;
-    [SerializeField] private KeyCode rightDefenseKey = KeyCode.RightArrow;
-
     private Dictionary<DefensePosition, DefenseRegionData> defenseRegions;
     private float globalCooldownTimer;
     private bool defenseEnabled;
+    private GameInputReader inputReader;
 
     public bool IsDefenseEnabled => defenseEnabled;
 
@@ -32,6 +41,31 @@ public class DefenseManager : MonoBehaviour
         }
 
         InitializeDefenseRegions();
+    }
+
+    private void OnEnable()
+    {
+        inputReader = FindFirstObjectByType<GameInputReader>();
+        if (inputReader == null)
+        {
+            return;
+        }
+
+        inputReader.DefendLeftPerformed += HandleLeftDefense;
+        inputReader.DefendUpPerformed += HandleUpDefense;
+        inputReader.DefendRightPerformed += HandleRightDefense;
+    }
+
+    private void OnDisable()
+    {
+        if (inputReader == null)
+        {
+            return;
+        }
+
+        inputReader.DefendLeftPerformed -= HandleLeftDefense;
+        inputReader.DefendUpPerformed -= HandleUpDefense;
+        inputReader.DefendRightPerformed -= HandleRightDefense;
     }
 
     private void InitializeDefenseRegions()
@@ -51,7 +85,6 @@ public class DefenseManager : MonoBehaviour
 
         UpdateGlobalCooldown();
         UpdateDefenseTimers();
-        ProcessDefenseInput();
     }
 
     private void UpdateGlobalCooldown()
@@ -70,32 +103,38 @@ public class DefenseManager : MonoBehaviour
         }
     }
 
-    private void ProcessDefenseInput()
+    private void HandleLeftDefense()
     {
-        if (globalCooldownTimer > 0f)
-            return;
-
-        ProcessRegionInput(DefensePosition.Left, leftDefenseKey);
-        ProcessRegionInput(DefensePosition.Up, upDefenseKey);
-        ProcessRegionInput(DefensePosition.Right, rightDefenseKey);
+        TryActivateDefense(DefensePosition.Left);
     }
 
-    private void ProcessRegionInput(DefensePosition position, KeyCode key)
+    private void HandleUpDefense()
     {
-        DefenseRegionData region = defenseRegions[position];
+        TryActivateDefense(DefensePosition.Up);
+    }
 
-        if (Input.GetKeyDown(key))
+    private void HandleRightDefense()
+    {
+        TryActivateDefense(DefensePosition.Right);
+    }
+
+    private void TryActivateDefense(DefensePosition position)
+    {
+        if (!defenseEnabled || globalCooldownTimer > 0f)
         {
-            if (!region.isActive && globalCooldownTimer <= 0f)
-            {
-                region.Activate();
-                globalCooldownTimer = globalCooldown;
-                
-                PlayDefenseAnimation(position);
-                
-                Debug.Log($"Defesa {position} ativada! Timer iniciado.");
-            }
+            return;
         }
+
+        DefenseRegionData region = defenseRegions[position];
+        if (region.isActive)
+        {
+            return;
+        }
+
+        region.Activate();
+        globalCooldownTimer = globalCooldown;
+        PlayDefenseAnimation(position);
+        Debug.Log($"Defesa {position} ativada! Timer iniciado.");
     }
 
     private void PlayDefenseAnimation(DefensePosition position)
@@ -206,4 +245,7 @@ public class DefenseManager : MonoBehaviour
     {
         return Mathf.Max(0f, globalCooldownTimer);
     }
+}
+
+
 }

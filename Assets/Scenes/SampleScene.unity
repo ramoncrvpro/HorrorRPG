@@ -132,7 +132,7 @@ GameObject:
   - component: {fileID: 25120795}
   - component: {fileID: 25120794}
   - component: {fileID: 25120793}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: WardrobeInteraction
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -290,7 +290,7 @@ GameObject:
   - component: {fileID: 139984788}
   - component: {fileID: 139984787}
   - component: {fileID: 139984786}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: KeyInteraction
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1072,6 +1072,63 @@ Transform:
   - {fileID: 1725842221}
   m_Father: {fileID: 997888440}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &688937478
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2190799063805882500, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
+      propertyPath: m_Name
+      value: GameBootstrap
+      objectReference: {fileID: 0}
+    - target: {fileID: 8920360635430720219, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8920360635430720219, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8920360635430720219, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8920360635430720219, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8920360635430720219, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8920360635430720219, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8920360635430720219, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8920360635430720219, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8920360635430720219, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8920360635430720219, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6f87fe7ed3155b43aae4e715e85ffb8, type: 3}
 --- !u!1 &713727901
 GameObject:
   m_ObjectHideFlags: 0
@@ -1085,7 +1142,7 @@ GameObject:
   - component: {fileID: 713727904}
   - component: {fileID: 713727903}
   - component: {fileID: 713727902}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: BibleAmmo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1349,7 +1406,7 @@ GameObject:
   - component: {fileID: 832276595}
   - component: {fileID: 832276594}
   - component: {fileID: 832276593}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: BibleInteraction
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2061,7 +2118,7 @@ GameObject:
   - component: {fileID: 1508592084}
   - component: {fileID: 1508592083}
   - component: {fileID: 1508592082}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: MedicineBox (3)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2186,7 +2243,7 @@ GameObject:
   - component: {fileID: 1537410293}
   - component: {fileID: 1537410292}
   - component: {fileID: 1537410291}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: CruxInteraction
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3129,7 +3186,7 @@ GameObject:
   - component: {fileID: 2020292132}
   - component: {fileID: 2020292131}
   - component: {fileID: 2020292130}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: LadderInteractio
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3509,8 +3566,28 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 6428751626346027347, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2405319463409069941}
   m_SourcePrefab: {fileID: 100100000, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
+--- !u!1 &2405319463409069940 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6428751626346027347, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
+  m_PrefabInstance: {fileID: 2405319463409069939}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2405319463409069941
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2405319463409069940}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 825ecce6ad2c7e34e9a3a4e20519bffb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &8169193833184790797
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3588,3 +3665,4 @@ SceneRoots:
   - {fileID: 1121830676}
   - {fileID: 27101304}
   - {fileID: 2405319463409069939}
+  - {fileID: 688937478}

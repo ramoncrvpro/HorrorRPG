@@ -1,3 +1,13 @@
+namespace HorrorRPG.Battle
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using UnityEngine;
 
 [System.Serializable]
@@ -15,4 +25,7 @@ public class ProjectileSpawnData
     [Tooltip("Multiplicador de dano para este projétil (1.0 = dano base do inimigo)")]
     [Range(0f, 5f)]
     public float damageMultiplier = 1f;
+}
+
+
 }

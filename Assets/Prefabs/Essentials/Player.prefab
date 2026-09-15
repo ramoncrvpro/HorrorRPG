@@ -213,10 +213,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   moveSpeed: 5
-  gravity: 0
+  gravity: -9.81
   lookSensitivity: 2
   cameraTransform: {fileID: 7207810198738474768}
   handAnimationManager: {fileID: 0}
+  inputReader: {fileID: 0}
 --- !u!114 &9207394305917525490
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -232,9 +233,11 @@ MonoBehaviour:
   interactionRange: 3
   interactableLayer:
     serializedVersion: 2
-    m_Bits: 23
-  interactionKey: 101
+    m_Bits: 279
   raycastOrigin: {fileID: 7207810198738474768}
+  playerCamera: {fileID: 0}
+  inputReader: {fileID: 0}
+  promptUI: {fileID: 0}
 --- !u!114 &621399099536375644
 MonoBehaviour:
   m_ObjectHideFlags: 0

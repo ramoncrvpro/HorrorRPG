@@ -1,3 +1,15 @@
+namespace HorrorRPG.Dialogue
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+using HorrorRPG.Interaction;
+
+
+
 using System.Collections;
 using UnityEngine;
 
@@ -150,4 +162,7 @@ public class DialogueItemInteraction : MonoBehaviour, IInteractable
     {
         hasInteracted = false;
     }
+}
+
+
 }

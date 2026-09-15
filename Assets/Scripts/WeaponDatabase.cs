@@ -1,3 +1,13 @@
+namespace HorrorRPG.Inventory
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -31,4 +41,7 @@ public class WeaponDatabase : ScriptableObject
     {
         return weapons.Contains(weapon);
     }
+}
+
+
 }

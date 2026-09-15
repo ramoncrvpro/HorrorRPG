@@ -1,3 +1,9 @@
+namespace HorrorRPG.Editor
+{
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+
+
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
@@ -99,4 +105,7 @@ public class WeaponDatabaseEditor : Editor
         EditorGUILayout.LabelField("Armas Básicas:", basicWeapons.ToString());
         EditorGUILayout.LabelField("Armas com Munição:", limitedWeapons.ToString());
     }
+}
+
+
 }

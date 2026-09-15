@@ -1,3 +1,13 @@
+namespace HorrorRPG.Presentation
+{
+using HorrorRPG.Presentation;
+using HorrorRPG.Inventory;
+using HorrorRPG.Battle;
+using HorrorRPG.Dialogue;
+using HorrorRPG.Core;
+using HorrorRPG.Input;
+
+
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -6,28 +16,14 @@ public class UINavigationManager : MonoBehaviour
 {
     public static UINavigationManager Instance { get; private set; }
 
-    private Stack<UIState> navigationStack = new Stack<UIState>();
+    [SerializeField] private GameInputReader inputReader;
+    private readonly Stack<UIState> navigationStack = new Stack<UIState>();
 
-    private void Awake()
-    {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
 
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            HandleBackNavigation();
-        }
-    }
+
+    private void Awake() { if (inputReader == null) inputReader = FindFirstObjectByType<GameInputReader>(); }
+    private void OnEnable() { if (inputReader != null) inputReader.CancelPerformed += HandleBackNavigation; }
+    private void OnDisable() { if (inputReader != null) inputReader.CancelPerformed -= HandleBackNavigation; }
 
     public void PushState(UIState state)
     {
@@ -78,4 +74,7 @@ public class UIState
         stateName = name;
         onBackPressed = backCallback;
     }
+}
+
+
 }
