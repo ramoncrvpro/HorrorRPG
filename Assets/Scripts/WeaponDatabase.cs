@@ -1,11 +1,6 @@
 namespace HorrorRPG.Inventory
 {
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
 using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
 
 
 using System.Collections.Generic;
@@ -23,7 +18,7 @@ public class WeaponDatabase : ScriptableObject
 
         foreach (WeaponData weapon in weapons)
         {
-            if (weapon != null && weapon.name == weaponName)
+            if (weapon != null && (weapon.Id == weaponName || weapon.name == weaponName || weapon.itemName == weaponName))
             {
                 return weapon;
             }

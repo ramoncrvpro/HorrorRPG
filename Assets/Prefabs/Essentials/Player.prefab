@@ -148,9 +148,9 @@ GameObject:
   - component: {fileID: 5039282548184339463}
   - component: {fileID: 3584932717707383422}
   - component: {fileID: 2470823023043523152}
-  - component: {fileID: 9207394305917525490}
   - component: {fileID: 621399099536375644}
   - component: {fileID: 4812786434242850142}
+  - component: {fileID: 8892163631562339175}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -218,26 +218,6 @@ MonoBehaviour:
   cameraTransform: {fileID: 7207810198738474768}
   handAnimationManager: {fileID: 0}
   inputReader: {fileID: 0}
---- !u!114 &9207394305917525490
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2036272197541622047}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c4c106d198765d94896b11520268218b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  interactionRange: 3
-  interactableLayer:
-    serializedVersion: 2
-    m_Bits: 279
-  raycastOrigin: {fileID: 7207810198738474768}
-  playerCamera: {fileID: 0}
-  inputReader: {fileID: 0}
-  promptUI: {fileID: 0}
 --- !u!114 &621399099536375644
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -263,6 +243,26 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 100
+--- !u!114 &8892163631562339175
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2036272197541622047}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4c106d198765d94896b11520268218b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  interactionRange: 3
+  interactableLayer:
+    serializedVersion: 2
+    m_Bits: 256
+  raycastOrigin: {fileID: 7207810198738474768}
+  playerCamera: {fileID: 8808244301043545195}
+  inputReader: {fileID: 0}
+  promptUI: {fileID: 0}
 --- !u!1 &3193058891826723109
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,134 +1,88 @@
-namespace HorrorRPG.Inventory
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
-
-
+using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
-public class ItemSlotUI : MonoBehaviour
+namespace HorrorRPG.Inventory
 {
-    [SerializeField] private TextMeshProUGUI itemNameText;
-    [SerializeField] private TextMeshProUGUI itemAmountText;
-    [SerializeField] private Image backgroundImage;
-
-    private InventorySlot currentSlot;
-    private ItemData currentItemData;
-    private int currentQuantity;
-    private InventoryManager inventoryManager;
-    private Color defaultNameColor = Color.white;
-    private Color defaultAmountColor = Color.white;
-    private Color selectedNameColor = Color.black;
-    private Color selectedAmountColor = Color.black;
-
-    private void Awake()
+    /// <summary>Renders one immutable inventory entry.</summary>
+    public class ItemSlotUI : MonoBehaviour
     {
-        if (itemNameText == null)
-            itemNameText = transform.Find("ItemNameText").GetComponent<TextMeshProUGUI>();
-        
-        if (itemAmountText == null)
-            itemAmountText = transform.Find("ItemAmountText").GetComponent<TextMeshProUGUI>();
-        
-        if (backgroundImage == null)
-            backgroundImage = GetComponent<Image>();
+        [SerializeField] private TextMeshProUGUI itemNameText;
+        [SerializeField] private TextMeshProUGUI itemAmountText;
+        [SerializeField] private Image backgroundImage;
 
-        if (itemNameText != null)
-            defaultNameColor = itemNameText.color;
-        
-        if (itemAmountText != null)
-            defaultAmountColor = itemAmountText.color;
-    }
+        private readonly Color selectedNameColor = Color.black;
+        private readonly Color selectedAmountColor = Color.black;
+        private Color defaultNameColor = Color.white;
+        private Color defaultAmountColor = Color.white;
+        private InventoryEntry entry;
+        private bool hasEntry;
 
-    public void Setup(InventorySlot slot, InventoryManager manager)
-    {
-        currentSlot = slot;
-        inventoryManager = manager;
-        currentItemData = slot?.itemData;
-        currentQuantity = slot?.quantity ?? 0;
+        public event Action<ItemSlotUI> Clicked;
 
-        if (slot != null && slot.itemData != null)
+        private void Awake()
         {
-            itemNameText.text = slot.itemData.itemName;
-            itemAmountText.text = "x" + slot.quantity.ToString();
+            if (itemNameText != null) defaultNameColor = itemNameText.color;
+            if (itemAmountText != null) defaultAmountColor = itemAmountText.color;
+            SetSelected(false);
+        }
+
+        /// <summary>Renders the supplied immutable inventory entry.</summary>
+        public void Setup(InventoryEntry inventoryEntry)
+        {
+            entry = inventoryEntry;
+            hasEntry = inventoryEntry.Item != null && inventoryEntry.Quantity > 0;
+            SetSelected(false);
+            if (!hasEntry)
+            {
+                Clear();
+                return;
+            }
+            if (itemNameText != null) itemNameText.text = entry.Item.itemName;
+            if (itemAmountText != null) itemAmountText.text = $"x{entry.Quantity}";
             gameObject.SetActive(true);
         }
-        else
+
+        /// <summary>Renders an item and quantity for battle menus without manager coupling.</summary>
+        public void Setup(ItemData item, int quantity)
         {
+            if (item == null || quantity <= 0)
+            {
+                Clear();
+                return;
+            }
+            Setup(new InventoryEntry(item, quantity));
+        }
+
+
+        /// <summary>Clears the entry and selection before slot reuse.</summary>
+        public void Clear()
+        {
+            hasEntry = false;
+            entry = default;
+            SetSelected(false);
             gameObject.SetActive(false);
         }
-    }
 
-    public void Setup(ItemData item, int quantity)
-    {
-        currentItemData = item;
-        currentQuantity = quantity;
-        currentSlot = null;
-        inventoryManager = null;
-
-        if (item != null)
+        /// <summary>Forwards a serialized UI click without referencing a manager.</summary>
+        public void OnSlotClicked()
         {
-            itemNameText.text = item.itemName;
-            itemAmountText.text = "x" + quantity.ToString();
-            gameObject.SetActive(true);
-        }
-        else
-        {
-            gameObject.SetActive(false);
-        }
-    }
-
-    public void OnSlotClicked()
-    {
-        if (currentSlot != null && currentSlot.itemData != null && inventoryManager != null)
-        {
-            inventoryManager.SelectSlot(this);
-        }
-    }
-
-    public void SetSelected(bool selected)
-    {
-        if (backgroundImage != null)
-        {
-            backgroundImage.enabled = selected;
+            if (hasEntry) Clicked?.Invoke(this);
         }
 
-        if (itemNameText != null)
+        /// <summary>Updates selection colors and background visibility.</summary>
+        public void SetSelected(bool selected)
         {
-            itemNameText.color = selected ? selectedNameColor : defaultNameColor;
+            if (backgroundImage != null) backgroundImage.enabled = selected;
+            if (itemNameText != null) itemNameText.color = selected ? selectedNameColor : defaultNameColor;
+            if (itemAmountText != null) itemAmountText.color = selected ? selectedAmountColor : defaultAmountColor;
         }
 
-        if (itemAmountText != null)
-        {
-            itemAmountText.color = selected ? selectedAmountColor : defaultAmountColor;
-        }
+        /// <summary>Returns the immutable entry currently rendered by this slot.</summary>
+        public InventoryEntry GetEntry() => entry;
+
+        /// <summary>Returns the item currently rendered for battle menu compatibility.</summary>
+        public ItemData GetItemData() => hasEntry ? entry.Item : null;
     }
-
-    public InventorySlot GetSlot()
-    {
-        return currentSlot;
-    }
-
-    public ItemData GetItemData()
-    {
-        return currentItemData;
-    }
-
-    public int GetQuantity()
-    {
-        return currentQuantity;
-    }
-
-    public int GetSlotIndex()
-    {
-        return inventoryManager != null ? inventoryManager.GetSlotIndex(this) : -1;
-    }
-}
-
-
 }

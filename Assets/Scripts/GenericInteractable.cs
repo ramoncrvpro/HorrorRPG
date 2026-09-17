@@ -1,45 +1,27 @@
-namespace HorrorRPG.Interaction
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
-
-
 using UnityEngine;
 using UnityEngine.Events;
 
-public class GenericInteractable : MonoBehaviour, IInteractable
+namespace HorrorRPG.Interaction
 {
-    [SerializeField] private string interactionPrompt = "Press E to interact";
-    [SerializeField] private bool canInteract = true;
-    [SerializeField] private UnityEvent onInteract;
-
-    public void Interact()
+    public class GenericInteractable : MonoBehaviour, IInteractable
     {
-        if (canInteract)
+        [SerializeField] private string interactionPrompt = "Press E to interact";
+        [SerializeField] private bool canInteract = true;
+        [SerializeField] private UnityEvent onInteract;
+
+        /// <summary>Invokes the configured interaction event when enabled.</summary>
+        public void Interact(in InteractionContext context)
         {
-            onInteract?.Invoke();
+            if (CanInteract(in context)) onInteract?.Invoke();
         }
+
+        /// <summary>Returns the configured prompt.</summary>
+        public string GetInteractionPrompt(in InteractionContext context) => interactionPrompt;
+
+        /// <summary>Returns whether this generic interaction is enabled.</summary>
+        public bool CanInteract(in InteractionContext context) => canInteract;
+
+        /// <summary>Enables or disables this interaction.</summary>
+        public void SetCanInteract(bool value) => canInteract = value;
     }
-
-    public string GetInteractionPrompt()
-    {
-        return interactionPrompt;
-    }
-
-    public bool CanInteract()
-    {
-        return canInteract;
-    }
-
-    public void SetCanInteract(bool value)
-    {
-        canInteract = value;
-    }
-}
-
-
 }

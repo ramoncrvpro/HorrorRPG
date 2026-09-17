@@ -33,9 +33,17 @@ namespace HorrorRPG.Core
         {
             if (entries == null) entries = new List<SceneCatalogEntry>();
             var ids = new HashSet<string>(StringComparer.Ordinal);
+            var sceneNames = new HashSet<string>(StringComparer.Ordinal);
             foreach (SceneCatalogEntry entry in entries)
             {
-                if (string.IsNullOrWhiteSpace(entry.Id) || string.IsNullOrWhiteSpace(entry.SceneName) || !ids.Add(entry.Id)) Debug.LogError($"Invalid or duplicate scene catalog entry: '{entry.Id}'.", this);
+                bool validId = !string.IsNullOrWhiteSpace(entry.Id);
+                bool validScene = !string.IsNullOrWhiteSpace(entry.SceneName);
+                bool duplicateId = validId && !ids.Add(entry.Id);
+                bool duplicateScene = validScene && !sceneNames.Add(entry.SceneName);
+                if (!validId || !validScene || duplicateId || duplicateScene)
+                {
+                    Debug.LogError($"Invalid or duplicate scene catalog entry: id='{entry.Id}', scene='{entry.SceneName}'.", this);
+                }
             }
         }
     }

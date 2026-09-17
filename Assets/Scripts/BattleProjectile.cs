@@ -1,178 +1,146 @@
+using System;
+using System.Collections;
+using UnityEngine;
+
 namespace HorrorRPG.Battle
 {
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
+    public enum ProjectileState { Inactive, Looping, Ready, Traveling, Hit }
+    public enum DefensePosition { Left, Up, Right }
 
-
-using UnityEngine;
-using System.Collections;
-
-public enum ProjectileState
-{
-    Looping,
-    Traveling,
-    Hit
-}
-
-public enum DefensePosition
-{
-    Left = 0,
-    Up = 1,
-    Right = 2
-}
-
-public class BattleProjectile : MonoBehaviour
-{
-    [SerializeField] private MeshRenderer projectileMeshRenderer;
-    
-    private ProjectileConfig config;
-    private ProjectileState currentState;
-    private DefensePosition targetPosition;
-    private Transform targetTransform;
-    private Vector3 loopCenter;
-    private float loopAngle;
-    private float loopTimer;
-    private float loopDuration;
-    private int damageAmount;
-    private float initialDistanceToTarget;
-
-    public ProjectileState CurrentState => currentState;
-    public DefensePosition TargetPosition => targetPosition;
-    public int DamageAmount => damageAmount;
-
-    private void Awake()
+    public readonly struct ProjectileExecutionContext
     {
-        if (projectileMeshRenderer == null)
+        public ProjectileExecutionContext(
+            ProjectileConfig config,
+            Vector3 loopCenter,
+            int damage,
+            Action<BattleProjectile> readyToAttack,
+            Action<BattleProjectile> reachedTarget,
+            Action<BattleProjectile> returnRequested)
         {
-            projectileMeshRenderer = GetComponent<MeshRenderer>();
+            Config = config != null ? config : throw new ArgumentNullException(nameof(config));
+            LoopCenter = loopCenter;
+            Damage = Mathf.Max(0, damage);
+            ReadyToAttack = readyToAttack ?? throw new ArgumentNullException(nameof(readyToAttack));
+            ReachedTarget = reachedTarget ?? throw new ArgumentNullException(nameof(reachedTarget));
+            ReturnRequested = returnRequested ?? throw new ArgumentNullException(nameof(returnRequested));
         }
+
+        public ProjectileConfig Config { get; }
+        public Vector3 LoopCenter { get; }
+        public int Damage { get; }
+        public Action<BattleProjectile> ReadyToAttack { get; }
+        public Action<BattleProjectile> ReachedTarget { get; }
+        public Action<BattleProjectile> ReturnRequested { get; }
     }
 
-    public void Initialize(ProjectileConfig projectileConfig, Vector3 center, int damage)
+    /// <summary>Executes movement for one pooled projectile using its owning execution context.</summary>
+    public class BattleProjectile : MonoBehaviour
     {
-        config = projectileConfig;
-        loopCenter = center;
-        damageAmount = damage;
-        currentState = ProjectileState.Looping;
-        loopAngle = Random.Range(0f, 360f);
-        loopTimer = 0f;
-        loopDuration = Random.Range(config.minLoopTime, config.maxLoopTime);
-        
-        Vector3 initialOffset = new Vector3(
-            Mathf.Cos(loopAngle) * config.loopRadius,
-            Mathf.Sin(loopAngle) * config.loopRadius,
-            0f
-        );
-        transform.position = loopCenter + initialOffset;
-        
-        if (projectileMeshRenderer != null && config.projectileMaterial != null)
+        private const float HitDistance = 0.1f;
+        private const float ReturnDelay = 0.2f;
+
+        [SerializeField] private SpriteRenderer projectileSpriteRenderer;
+
+        private ProjectileExecutionContext executionContext;
+        private Transform targetTransform;
+        private float loopAngle;
+        private float loopTimer;
+        private float loopDuration;
+        private float initialDistanceToTarget;
+        private bool initialized;
+
+        public ProjectileState CurrentState { get; private set; } = ProjectileState.Inactive;
+        public DefensePosition TargetPosition { get; private set; }
+        public int DamageAmount => executionContext.Damage;
+
+        private void Awake()
         {
-            projectileMeshRenderer.material = config.projectileMaterial;
+            if (projectileSpriteRenderer == null) projectileSpriteRenderer = GetComponent<SpriteRenderer>();
         }
-    }
 
-    public void StartTravelToTarget(Transform target, DefensePosition position)
-    {
-        targetTransform = target;
-        targetPosition = position;
-        currentState = ProjectileState.Traveling;
-        initialDistanceToTarget = Vector3.Distance(transform.position, targetTransform.position);
-    }
-
-    public void HitTarget()
-    {
-        currentState = ProjectileState.Hit;
-        StartCoroutine(DestroyAfterDelay(0.2f));
-    }
-
-    private void Update()
-    {
-        switch (currentState)
+        /// <summary>Initializes this pooled projectile for one owner execution.</summary>
+        public void Initialize(ProjectileExecutionContext context)
         {
-            case ProjectileState.Looping:
-                UpdateLooping();
-                break;
-            case ProjectileState.Traveling:
-                UpdateTraveling();
-                break;
+            StopAllCoroutines();
+            executionContext = context;
+            initialized = true;
+            targetTransform = null;
+            CurrentState = ProjectileState.Looping;
+            loopAngle = UnityEngine.Random.Range(0f, 360f);
+            loopTimer = 0f;
+            loopDuration = UnityEngine.Random.Range(context.Config.minLoopTime, context.Config.maxLoopTime);
+            Vector3 initialOffset = new Vector3(Mathf.Cos(loopAngle) * context.Config.loopRadius, Mathf.Sin(loopAngle) * context.Config.loopRadius, 0f);
+            transform.position = context.LoopCenter + initialOffset;
+            if (projectileSpriteRenderer != null && context.Config.ProjectileVisual != null)
+                projectileSpriteRenderer.sprite = context.Config.ProjectileVisual;
         }
-    }
 
-    private void UpdateLooping()
-    {
-        loopTimer += Time.deltaTime;
-        loopAngle += config.loopSpeed * Time.deltaTime;
-        
-        Vector3 offset = new Vector3(
-            Mathf.Cos(loopAngle) * config.loopRadius,
-            Mathf.Sin(loopAngle) * config.loopRadius,
-            0f
-        );
-        
-        transform.position = loopCenter + offset;
-        
-        if (loopTimer >= loopDuration)
+        /// <summary>Starts travel toward the defense target selected by the owner.</summary>
+        public void BeginTravel(Transform target, DefensePosition position)
         {
-            ProjectileManager.Instance.OnProjectileReadyToAttack(this);
+            if (!initialized || target == null) throw new InvalidOperationException("Projectile requires an initialized context and target.");
+            targetTransform = target;
+            TargetPosition = position;
+            initialDistanceToTarget = Mathf.Max(HitDistance, Vector3.Distance(transform.position, target.position));
+            CurrentState = ProjectileState.Traveling;
         }
-    }
 
-    private void UpdateTraveling()
-    {
-        if (targetTransform == null)
+        /// <summary>Marks a resolved hit and schedules return to the pool.</summary>
+        public void HitTarget()
         {
+            if (!initialized) return;
+            CurrentState = ProjectileState.Hit;
+            StartCoroutine(ReturnAfterDelay());
+        }
+
+        /// <summary>Returns this projectile through the owner that initialized it.</summary>
+        public void ReturnToPool()
+        {
+            if (!initialized) return;
+            StopAllCoroutines();
+            initialized = false;
+            CurrentState = ProjectileState.Inactive;
+            targetTransform = null;
+            executionContext.ReturnRequested(this);
+        }
+
+        private void Update()
+        {
+            if (!initialized) return;
+            if (CurrentState == ProjectileState.Looping) UpdateLooping();
+            else if (CurrentState == ProjectileState.Traveling) UpdateTraveling();
+        }
+
+        private void UpdateLooping()
+        {
+            ProjectileConfig config = executionContext.Config;
+            loopTimer += Time.deltaTime;
+            loopAngle += config.loopSpeed * Time.deltaTime;
+            Vector3 offset = new Vector3(Mathf.Cos(loopAngle) * config.loopRadius, Mathf.Sin(loopAngle) * config.loopRadius, 0f);
+            transform.position = executionContext.LoopCenter + offset;
+            if (loopTimer < loopDuration) return;
+            CurrentState = ProjectileState.Ready;
+            executionContext.ReadyToAttack(this);
+        }
+
+        private void UpdateTraveling()
+        {
+            if (targetTransform == null)
+            {
+                executionContext.ReachedTarget(this);
+                return;
+            }
+            float currentDistance = Vector3.Distance(transform.position, targetTransform.position);
+            float proximity = Mathf.Clamp01(1f - currentDistance / initialDistanceToTarget);
+            float speed = Mathf.Lerp(executionContext.Config.minTravelSpeed, executionContext.Config.maxTravelSpeed, proximity);
+            transform.position = Vector3.MoveTowards(transform.position, targetTransform.position, speed * Time.deltaTime);
+            if (currentDistance <= HitDistance) executionContext.ReachedTarget(this);
+        }
+
+        private IEnumerator ReturnAfterDelay()
+        {
+            yield return new WaitForSeconds(ReturnDelay);
             ReturnToPool();
-            return;
-        }
-        
-        float currentDistance = Vector3.Distance(transform.position, targetTransform.position);
-        float proximityFactor = 1f - (currentDistance / initialDistanceToTarget);
-        proximityFactor = Mathf.Clamp01(proximityFactor);
-        
-        float currentSpeed = Mathf.Lerp(config.minTravelSpeed, config.maxTravelSpeed, proximityFactor);
-        
-        transform.position = Vector3.MoveTowards(
-            transform.position,
-            targetTransform.position,
-            currentSpeed * Time.deltaTime
-        );
-        
-        if (currentDistance < 0.1f)
-        {
-            ProjectileManager.Instance.OnProjectileReachedTarget(this);
         }
     }
-
-    public float GetDistanceToTarget()
-    {
-        if (targetTransform == null)
-            return float.MaxValue;
-        
-        return Vector3.Distance(transform.position, targetTransform.position);
-    }
-
-    private IEnumerator DestroyAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        ReturnToPool();
-    }
-
-    private void ReturnToPool()
-    {
-        if (ProjectileManager.Instance != null)
-        {
-            ProjectileManager.Instance.ReturnProjectileToPool(this);
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
-}
-
-
 }

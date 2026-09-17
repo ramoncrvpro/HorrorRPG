@@ -1,16 +1,15 @@
 namespace HorrorRPG.Interaction
 {
+    /// <summary>Contract implemented by player-facing world interactions.</summary>
+    public interface IInteractable
+    {
+        /// <summary>Returns whether the target can currently be used.</summary>
+        bool CanInteract(in InteractionContext context);
 
-using UnityEngine;
+        /// <summary>Returns the prompt shown for the current interaction.</summary>
+        string GetInteractionPrompt(in InteractionContext context);
 
-public interface IInteractable
-{
-    void Interact();
-    
-    string GetInteractionPrompt();
-    
-    bool CanInteract();
-}
-
-
+        /// <summary>Executes the interaction using scene-injected dependencies.</summary>
+        void Interact(in InteractionContext context);
+    }
 }

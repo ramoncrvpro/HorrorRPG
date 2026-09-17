@@ -1,454 +1,277 @@
-namespace HorrorRPG.Battle
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
+using System;
+using System.Collections;
 using HorrorRPG.Core;
 using HorrorRPG.Input;
-using HorrorRPG.Player;
-
-
-
+using HorrorRPG.Inventory;
+using HorrorRPG.Presentation;
 using UnityEngine;
-using System.Collections;
-using UnityEngine.SceneManagement;
 
-public class BattleManager : MonoBehaviour
+namespace HorrorRPG.Battle
 {
-    public static BattleManager Instance { get; private set; }
-
-    private const string CONTROL_LOCK_ID = "BattleSystem";
-    private const float TURN_DELAY = 1f;
-
-    [Header("Battle Arena")]
-    [SerializeField] private GameObject battleArena;
-    [SerializeField] private MeshRenderer battleEnemyRenderer;
-    [SerializeField] private BattleEnemyEffects battleEnemyEffects;
-    [SerializeField] private EnemyAnimationController enemyAnimationController;
-    
-    [Header("Timing System")]
-    [SerializeField] private AttackTimingBar attackTimingBar;
-    [SerializeField] private AttackTimingUI attackTimingUI;
-
-    [Header("Transition Effects")]
-    [SerializeField] private BattleTransitionEffects transitionEffects;
-
-    [Header("Enemy Data")]
-    [SerializeField] private EnemyData currentEnemyData;
-
-    [Header("Battle Delays")]
-    [SerializeField] private float enemyDeathDelay = 1f;
-
-    private bool isInBattle = false;
-    private bool isProcessingTurn = false;
-    private int currentEnemyHealth;
-
-    private int damageBuffValue = 0;
-    private bool hasDamageBuff = false;
-    private float markerSpeedModifier = 1f;
-    private GameInputReader inputReader;
-
-    public EnemyData CurrentEnemyData => currentEnemyData;
-    public int CurrentEnemyHealth => currentEnemyHealth;
-    public bool IsProcessingTurn => isProcessingTurn;
-
-    private void Awake()
+    /// <summary>Coordinates battle rules with arena, timing, projectile and transition presentation.</summary>
+    public class BattleManager : MonoBehaviour, IGameContextReceiver
     {
-        if (Instance == null)
+        [Header("Battle Arena")]
+        [SerializeField] private GameObject battleArena;
+        [SerializeField] private SpriteRenderer battleEnemyRenderer;
+        [SerializeField] private BattleEnemyEffects battleEnemyEffects;
+        [SerializeField] private EnemyAnimationController enemyAnimationController;
+        [Header("Timing System")]
+        [SerializeField] private AttackTimingBar attackTimingBar;
+        [SerializeField] private AttackTimingUI attackTimingUI;
+        [Header("Battle Systems")]
+        [SerializeField] private BattleUIManager battleUIManager;
+        [SerializeField] private DefenseManager defenseManager;
+        [SerializeField] private ProjectileManager projectileManager;
+        [SerializeField] private BattlePlayerEffects battlePlayerEffects;
+        [Header("Transition Effects")]
+        [SerializeField] private BattleTransitionEffects transitionEffects;
+        [Header("Enemy Data")]
+        [SerializeField] private EnemyData currentEnemyData;
+        [Header("Battle Delays")]
+        [SerializeField] private float enemyDeathDelay = 1f;
+
+        private GameContext gameContext;
+        private BattleService battleService;
+        private InputContextLease inputLease;
+        private ProjectileAttackHandle activeProjectileAttack;
+        private Coroutine enemyAttackCoroutine;
+        private Coroutine exitCoroutine;
+        private bool initialized;
+        private bool battlePresentationActive;
+
+        public EnemyData CurrentEnemyData => battleService?.State.Enemy ?? currentEnemyData;
+        public int CurrentEnemyHealth => battleService?.State.CurrentEnemyHealth ?? 0;
+        public bool IsProcessingTurn => battleService != null && battleService.State.Phase != BattlePhase.PlayerChoice && battleService.State.Phase != BattlePhase.Idle;
+        public event Action<BattleEndReason> BattleEnded;
+
+        private void Awake()
         {
-            Instance = this;
+            if (defenseManager == null) defenseManager = GetComponent<DefenseManager>();
+            if (attackTimingBar == null) attackTimingBar = GetComponent<AttackTimingBar>();
+            if (projectileManager == null) projectileManager = GetComponent<ProjectileManager>();
+            if (battleArena != null) battleArena.SetActive(false);
         }
-        else
+
+        /// <summary>Injects battle services and connects scene-local presenters.</summary>
+        public void Initialize(GameContext context)
         {
-            Destroy(gameObject);
-            return;
+            if (initialized) return;
+            gameContext = context ?? throw new ArgumentNullException(nameof(context));
+            battleService = context.Battle;
+            battleService.PhaseChanged += HandlePhaseChanged;
+            battleService.Ended += HandleBattleEnded;
+            if (battleUIManager != null)
+            {
+                battleUIManager.WeaponSelected += PlayerAttack;
+                battleUIManager.ConsumableSelected += PlayerUseItem;
+                battleUIManager.RunRequested += RunFromBattle;
+            }
+            initialized = true;
         }
 
-        inputReader = FindFirstObjectByType<GameInputReader>();
-    }
-
-    public void StartBattle(MeshRenderer sourceEnemyRenderer, EnemyData enemyData)
-    {
-        if (isInBattle)
-            return;
-
-        if (sourceEnemyRenderer == null)
+        /// <summary>Cancels scene-owned executions and releases all battle dependencies.</summary>
+        public void Deinitialize()
         {
-            Debug.LogWarning("BattleManager: sourceEnemyRenderer é null.");
-            return;
+            if (!initialized) return;
+            battleService.PhaseChanged -= HandlePhaseChanged;
+            battleService.Ended -= HandleBattleEnded;
+            if (battleUIManager != null)
+            {
+                battleUIManager.WeaponSelected -= PlayerAttack;
+                battleUIManager.ConsumableSelected -= PlayerUseItem;
+                battleUIManager.RunRequested -= RunFromBattle;
+            }
+            StopAllCoroutines();
+            attackTimingBar?.Cancel();
+            projectileManager?.Cancel(activeProjectileAttack);
+            defenseManager?.End();
+            CleanupPresentation();
+            gameContext = null;
+            battleService = null;
+            initialized = false;
         }
 
-        if (enemyData == null)
+        /// <summary>Validates visual dependencies and starts a battle once.</summary>
+        public bool StartBattle(SpriteRenderer sourceEnemyRenderer, SpriteRendererAnimator sourceEnemyAnimator, EnemyData enemyData)
         {
-            Debug.LogWarning("BattleManager: enemyData é null.");
-            return;
+            if (!initialized || battlePresentationActive || sourceEnemyRenderer == null || enemyData == null) return false;
+            if (battleArena == null || battleEnemyRenderer == null || battleUIManager == null || attackTimingBar == null || defenseManager == null || projectileManager == null)
+            {
+                Debug.LogError($"{nameof(BattleManager)} has incomplete battle presentation references on {name}.", this);
+                return false;
+            }
+            BattleCommandResult result = battleService.StartBattle(enemyData);
+            if (!result.Accepted) return false;
+            currentEnemyData = enemyData;
+            StartCoroutine(StartBattleSequence(sourceEnemyRenderer, sourceEnemyAnimator));
+            return true;
         }
 
-        if (battleEnemyRenderer == null)
+        /// <summary>Selects a weapon and begins its cancelable timing window.</summary>
+        public void PlayerAttack(WeaponData weapon)
         {
-            Debug.LogWarning("BattleManager: battleEnemyRenderer não está definido no Inspector.");
-            return;
+            if (battleService == null || !battleService.SelectWeapon(weapon).Accepted) return;
+            attackTimingBar.SetSpeedModifier(battleService.State.TimingSpeedModifier);
+            attackTimingBar.Begin(weapon, ResolvePlayerAttack);
         }
 
-        if (battleArena == null)
+        /// <summary>Uses one consumable through battle rules.</summary>
+        public void PlayerUseItem(ConsumableData consumable)
         {
-            Debug.LogWarning("BattleManager: battleArena não está definido no Inspector.");
-            return;
+            if (battleService == null) return;
+            BattleCommandResult result = battleService.UseConsumable(consumable);
+            if (result.Accepted) battlePlayerEffects?.PlayItemUseEffects();
         }
 
-        StartCoroutine(StartBattleSequence(sourceEnemyRenderer, enemyData));
-    }
+        /// <summary>Returns whether the battle presentation is active.</summary>
+        public bool IsInBattle() => battlePresentationActive;
 
-    private IEnumerator StartBattleSequence(MeshRenderer sourceEnemyRenderer, EnemyData enemyData)
-    {
-        currentEnemyData = enemyData;
-        isInBattle = true;
-        currentEnemyHealth = currentEnemyData.maxHealth;
-
-        battleEnemyRenderer.sharedMaterials = sourceEnemyRenderer.sharedMaterials;
-
-        PlayerControlManager.Instance.LockControl(CONTROL_LOCK_ID);
-
-        bool transitionComplete = false;
-        if (transitionEffects != null)
+        /// <summary>Requests a normal battle exit.</summary>
+        public void EndBattle()
         {
-            transitionEffects.PlayBattleStartEffects(() => transitionComplete = true);
+            if (battleService?.State.Phase == BattlePhase.PlayerChoice) battleService.Run();
+        }
+
+        private IEnumerator StartBattleSequence(SpriteRenderer sourceEnemyRenderer, SpriteRendererAnimator sourceEnemyAnimator)
+        {
+            battlePresentationActive = true;
+            battleEnemyRenderer.sprite = sourceEnemyRenderer.sprite;
+            battleEnemyRenderer.color = sourceEnemyRenderer.color;
+            battleEnemyRenderer.flipX = sourceEnemyRenderer.flipX;
+            battleEnemyRenderer.flipY = sourceEnemyRenderer.flipY;
+            SpriteRendererAnimator battleEnemyAnimator = battleEnemyRenderer.GetComponent<SpriteRendererAnimator>();
+            if (battleEnemyAnimator != null && sourceEnemyAnimator != null && sourceEnemyAnimator.Animation != null)
+            {
+                battleEnemyAnimator.Play(sourceEnemyAnimator.Animation);
+            }
+            inputLease = gameContext.Input.Acquire(InputContext.Battle, InputBlockReason.Battle);
+            bool transitionComplete = transitionEffects == null;
+            transitionEffects?.PlayBattleStartEffects(() => transitionComplete = true);
             yield return new WaitUntil(() => transitionComplete);
+            battleArena.SetActive(true);
+            enemyAnimationController?.PlayStartAnimation();
+            battleUIManager.InitializeBattle();
+            battleService.EnterPlayerChoice();
         }
 
-        battleArena.SetActive(true);
-        if (inputReader == null)
+        private void ResolvePlayerAttack(AttackResult result)
         {
-            inputReader = FindFirstObjectByType<GameInputReader>();
-        }
-        inputReader?.SetContext(InputContext.Battle);
-
-        if (enemyAnimationController != null)
-        {
-            enemyAnimationController.PlayStartAnimation();
+            if (result != AttackResult.Miss) battleEnemyEffects?.PlayHitEffects();
+            battleService.ResolvePlayerAttack(result);
         }
 
-        if (BattleUIManager.Instance != null)
+        private void HandlePhaseChanged(BattlePhase phase)
         {
-            BattleUIManager.Instance.InitializeBattle();
+            if (phase == BattlePhase.EnemyAttack && enemyAttackCoroutine == null)
+                enemyAttackCoroutine = StartCoroutine(ProcessEnemyAttack());
         }
 
-        if (BattleUIManager.Instance != null)
+        private IEnumerator ProcessEnemyAttack()
         {
-            BattleUIManager.Instance.OpenMainMenu();
-        }
-
-        Debug.Log("BattleManager: Batalha iniciada.");
-    }
-
-    public void PlayerAttack(WeaponData weapon)
-    {
-        if (isProcessingTurn || !isInBattle)
-            return;
-
-        StartCoroutine(ProcessPlayerTurn(weapon));
-    }
-
-    private IEnumerator ProcessPlayerTurn(WeaponData weapon)
-    {
-        isProcessingTurn = true;
-
-        if (BattleUIManager.Instance != null)
-        {
-            BattleUIManager.Instance.HideAllMenus();
-        }
-
-        AttackResult result = AttackResult.Miss;
-        bool timingComplete = false;
-
-        if (AttackTimingBar.Instance != null)
-        {
-            AttackTimingBar.Instance.StartTiming(weapon, (res) =>
+            if (!battleService.BeginEnemyAttack().Accepted)
             {
-                result = res;
-                timingComplete = true;
-            });
-        }
-        else
-        {
-            result = AttackResult.Hit;
-            timingComplete = true;
-        }
-
-        yield return new WaitUntil(() => timingComplete);
-
-        int damage = weapon.GetDamageByResult(result, currentEnemyData.category);
-        
-        if (hasDamageBuff)
-        {
-            damage += damageBuffValue;
-            hasDamageBuff = false;
-            damageBuffValue = 0;
-            Debug.Log($"Buff de dano aplicado! Dano aumentado em {damageBuffValue}");
-        }
-        
-        currentEnemyHealth = Mathf.Max(0, currentEnemyHealth - damage);
-
-        if (battleEnemyEffects != null && result != AttackResult.Miss)
-        {
-            battleEnemyEffects.PlayHitEffects();
-        }
-
-        string resultText = result == AttackResult.Critical ? "CRÍTICO!" : 
-                           result == AttackResult.Hit ? "acertou" : "ERROU!";
-        Debug.Log($"Player {resultText} com {weapon.itemName} causando {damage} de dano!");
-
-        if (BattleUIManager.Instance != null)
-        {
-            BattleUIManager.Instance.UpdateHealthBars();
-        }
-
-        if (currentEnemyHealth <= 0)
-        {
-            if (enemyAnimationController != null)
-            {
-                enemyAnimationController.PlayDeadAnimation();
+                enemyAttackCoroutine = null;
+                yield break;
             }
 
-            Debug.Log("Inimigo derrotado!");
-            yield return new WaitForSeconds(enemyDeathDelay);
-            
-            bool transitionComplete = false;
-            if (transitionEffects != null)
+            defenseManager.Begin(new DefenseRequest(0f));
+            EnemyData enemy = battleService.State.Enemy;
+            AttackData attack = enemy?.GetRandomAttack();
+            ProjectileAttackResult attackResult = null;
+            bool completed = false;
+            if (attack != null)
             {
-                transitionEffects.PlayBattleEndEffects(() => transitionComplete = true);
-                yield return new WaitUntil(() => transitionComplete);
-            }
-            
-            EndBattle();
-            yield break;
-        }
-
-        yield return new WaitForSeconds(TURN_DELAY);
-
-        yield return StartCoroutine(ProcessEnemyAttack());
-
-        if (PlayerStats.Instance != null && !PlayerStats.Instance.IsAlive())
-        {
-            yield return StartCoroutine(ProcessPlayerDeath());
-            yield break;
-        }
-
-        yield return new WaitForSeconds(TURN_DELAY);
-
-        isProcessingTurn = false;
-
-        if (BattleUIManager.Instance != null)
-        {
-            BattleUIManager.Instance.OpenMainMenu();
-        }
-    }
-
-    private IEnumerator ProcessEnemyAttack()
-    {
-        int enemyDamage = currentEnemyData.baseDamage;
-
-        if (DefenseManager.Instance != null)
-        {
-            DefenseManager.Instance.EnableDefense(true);
-        }
-
-        AttackData selectedAttack = currentEnemyData.GetRandomAttack();
-
-        if (selectedAttack != null && ProjectileManager.Instance != null)
-        {
-            int projectilesHit = 0;
-            int totalProjectiles = selectedAttack.GetProjectileCount();
-
-            ProjectileManager.Instance.SetDamageCallback((damage, defense) =>
-            {
-                projectilesHit++;
-
-                if (PlayerStats.Instance != null && damage > 0)
-                {
-                    PlayerStats.Instance.TakeDamage(damage);
-
-                    if (BattlePlayerEffects.Instance != null)
+                activeProjectileAttack = projectileManager.Execute(
+                    attack,
+                    enemy.baseDamage,
+                    ApplyProjectileResolution,
+                    result =>
                     {
-                        BattlePlayerEffects.Instance.PlayDamageEffects(defense);
-                    }
-
-                    Debug.Log($"Projétil causou {damage} de dano!");
-                }
-                else if (damage == 0)
-                {
-                    if (BattlePlayerEffects.Instance != null)
-                    {
-                        BattlePlayerEffects.Instance.PlayDamageEffects(DefenseType.Perfect);
-                    }
-
-                    Debug.Log("Projétil bloqueado! Nenhum dano recebido.");
-                }
-
-                if (BattleUIManager.Instance != null)
-                {
-                    BattleUIManager.Instance.UpdateHealthBars();
-                }
-            });
-
-            yield return StartCoroutine(
-                ProjectileManager.Instance.ExecuteAttack(selectedAttack, enemyDamage)
-            );
-
-            Debug.Log($"Ataque '{selectedAttack.attackName}' concluído! {projectilesHit}/{totalProjectiles} projéteis atingiram o alvo.");
-        }
-        else
-        {
-            if (PlayerStats.Instance != null)
+                        attackResult = result;
+                        completed = true;
+                    });
+                yield return new WaitUntil(() => completed);
+            }
+            else
             {
-                PlayerStats.Instance.TakeDamage(enemyDamage);
-
-                if (BattlePlayerEffects.Instance != null)
-                {
-                    BattlePlayerEffects.Instance.PlayDamageEffects();
-                }
-
-                Debug.Log($"Inimigo atacou causando {enemyDamage} de dano!");
+                attackResult = new ProjectileAttackResult(
+                    ProjectileAttackStatus.InvalidConfiguration,
+                    new[] { new ProjectileResolution(DefensePosition.Up, enemy != null ? enemy.baseDamage : 0, DefenseType.None) });
             }
 
-            if (BattleUIManager.Instance != null)
+            if (attackResult.Status == ProjectileAttackStatus.InvalidConfiguration && attackResult.Resolutions.Count == 0)
             {
-                BattleUIManager.Instance.UpdateHealthBars();
+                ApplyProjectileResolution(new ProjectileResolution(DefensePosition.Up, enemy != null ? enemy.baseDamage : 0, DefenseType.None));
             }
+            else if (attack == null)
+            {
+                foreach (ProjectileResolution resolution in attackResult.Resolutions) ApplyProjectileResolution(resolution);
+            }
+
+            defenseManager.End();
+            if (battleService.State.Phase == BattlePhase.Defense) battleService.CompleteEnemyAttack();
+            enemyAttackCoroutine = null;
         }
 
-        if (DefenseManager.Instance != null)
+        private void RunFromBattle()
         {
-            DefenseManager.Instance.EnableDefense(false);
+            battleService?.Run();
         }
-    }
 
-    private IEnumerator ProcessPlayerDeath()
-    {
-        Debug.Log("Player derrotado! Reiniciando cena...");
-        
-        bool transitionComplete = false;
-        if (transitionEffects != null)
+        private void HandleBattleEnded(BattleEndReason reason)
         {
-            transitionEffects.PlayBattleStartEffects(() => transitionComplete = true);
+            if (reason == BattleEndReason.SceneChanged)
+            {
+                CleanupPresentation();
+                BattleEnded?.Invoke(reason);
+                return;
+            }
+            if (exitCoroutine == null) exitCoroutine = StartCoroutine(FinishBattleSequence(reason));
+        }
+
+        private void ApplyProjectileResolution(ProjectileResolution resolution)
+        {
+            if (battleService == null || battleService.State.Phase != BattlePhase.Defense) return;
+            battleService.ResolveProjectile(new ProjectileHitResult(resolution.Damage, resolution.Position));
+            battlePlayerEffects?.PlayDamageEffects(resolution.DefenseType);
+        }
+
+        private IEnumerator FinishBattleSequence(BattleEndReason reason)
+        {
+            attackTimingBar?.Cancel();
+            projectileManager?.Cancel(activeProjectileAttack);
+            defenseManager?.End();
+            if (reason == BattleEndReason.Won)
+            {
+                enemyAnimationController?.PlayDeadAnimation();
+                yield return new WaitForSeconds(enemyDeathDelay);
+            }
+
+            bool transitionComplete = transitionEffects == null;
+            transitionEffects?.PlayBattleEndEffects(() => transitionComplete = true);
             yield return new WaitUntil(() => transitionComplete);
+            CleanupPresentation();
+            battleService.CompleteExit();
+            BattleEnded?.Invoke(reason);
+            exitCoroutine = null;
+            if (reason == BattleEndReason.Lost) gameContext.SceneFlow.ReloadCurrentScene(SceneReloadReason.PlayerDeath);
         }
 
-        yield return new WaitForSeconds(0.35f);
-
-        if (inputReader == null)
+        private void CleanupPresentation()
         {
-            inputReader = FindFirstObjectByType<GameInputReader>();
+            battlePresentationActive = false;
+            if (battleArena != null) battleArena.SetActive(false);
+            battleUIManager?.CloseBattleUI();
+            inputLease?.Dispose();
+            inputLease = null;
         }
-        inputReader?.SetContext(InputContext.Gameplay);
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+
+        private void OnValidate()
+        {
+            enemyDeathDelay = Mathf.Max(0f, enemyDeathDelay);
+        }
+
+        private void OnDestroy() => Deinitialize();
     }
-
-    public void EndBattle()
-    {
-        if (!isInBattle)
-            return;
-
-        isInBattle = false;
-        isProcessingTurn = false;
-
-        battleArena.SetActive(false);
-
-        if (inputReader == null)
-        {
-            inputReader = FindFirstObjectByType<GameInputReader>();
-        }
-        inputReader?.SetContext(InputContext.Gameplay);
-
-        PlayerControlManager.Instance.UnlockControl(CONTROL_LOCK_ID);
-
-        if (BattleUIManager.Instance != null)
-        {
-            BattleUIManager.Instance.CloseBattleUI();
-        }
-
-        Debug.Log("BattleManager: Batalha encerrada.");
-    }
-
-    public bool IsInBattle()
-    {
-        return isInBattle;
-    }
-
-    public void PlayerUseItem(ConsumableData consumable)
-    {
-        if (isProcessingTurn || !isInBattle)
-            return;
-
-        StartCoroutine(ProcessItemUsage(consumable));
-    }
-
-    private IEnumerator ProcessItemUsage(ConsumableData consumable)
-    {
-        isProcessingTurn = true;
-
-        if (BattleUIManager.Instance != null)
-        {
-            BattleUIManager.Instance.HideAllMenus();
-        }
-
-        switch (consumable.effectType)
-        {
-            case ConsumableEffectType.HealHealth:
-                if (PlayerStats.Instance != null)
-                {
-                    PlayerStats.Instance.Heal(consumable.effectValue);
-                    Debug.Log($"Item usado! Vida restaurada em {consumable.effectValue} pontos.");
-                }
-                break;
-
-            case ConsumableEffectType.IncreaseDamage:
-                damageBuffValue = consumable.effectValue;
-                hasDamageBuff = true;
-                Debug.Log($"Item usado! Próximo ataque terá {consumable.effectValue} de dano adicional.");
-                break;
-
-            case ConsumableEffectType.DecreaseMarkerSpeed:
-                markerSpeedModifier = 1f - (consumable.effectValue / 100f);
-                if (AttackTimingBar.Instance != null)
-                {
-                    AttackTimingBar.Instance.SetSpeedModifier(markerSpeedModifier);
-                }
-                Debug.Log($"Item usado! Velocidade do marker reduzida em {consumable.effectValue}%.");
-                break;
-        }
-
-        if (BattlePlayerEffects.Instance != null)
-        {
-            BattlePlayerEffects.Instance.PlayItemUseEffects();
-        }
-
-        if (BattleUIManager.Instance != null)
-        {
-            BattleUIManager.Instance.UpdateHealthBars();
-        }
-
-        yield return new WaitForSeconds(TURN_DELAY);
-
-        yield return StartCoroutine(ProcessEnemyAttack());
-
-        if (PlayerStats.Instance != null && !PlayerStats.Instance.IsAlive())
-        {
-            yield return StartCoroutine(ProcessPlayerDeath());
-            yield break;
-        }
-
-        yield return new WaitForSeconds(TURN_DELAY);
-
-        isProcessingTurn = false;
-
-        if (BattleUIManager.Instance != null)
-        {
-            BattleUIManager.Instance.OpenMainMenu();
-        }
-    }
-}
-
-
 }

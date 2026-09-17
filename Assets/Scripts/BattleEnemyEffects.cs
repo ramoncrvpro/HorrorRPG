@@ -1,171 +1,144 @@
+using System.Collections;
+using UnityEngine;
+
 namespace HorrorRPG.Battle
 {
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
-
-
-using UnityEngine;
-using System.Collections;
-
-public class BattleEnemyEffects : MonoBehaviour
-{
-    [Header("Hit Flash Settings")]
-    [SerializeField] private MeshRenderer enemyRenderer;
-    [SerializeField] private float hitFlashDuration = 0.3f;
-    [SerializeField] private float hitFlashIntensity = 1f;
-
-    [Header("Squeeze Settings")]
-    [SerializeField] private Transform enemyTransform;
-    [SerializeField] private float squeezeDuration = 0.2f;
-    [SerializeField] private float squeezeScaleX = 0.7f;
-    [SerializeField] private float squeezeScaleY = 1.3f;
-
-    private static readonly int HitEffectProperty = Shader.PropertyToID("_HitEffect");
-    private MaterialPropertyBlock propertyBlock;
-    private Vector3 originalScale;
-    private Coroutine hitFlashCoroutine;
-    private Coroutine squeezeCoroutine;
-
-    private void Awake()
+    /// <summary>Applies hit feedback to the battle enemy sprite and transform.</summary>
+    public class BattleEnemyEffects : MonoBehaviour
     {
-        if (enemyRenderer == null)
+        [Header("Hit Flash Settings")]
+        [SerializeField] private SpriteRenderer enemyRenderer;
+        [SerializeField] private float hitFlashDuration = 0.3f;
+        [SerializeField] private float hitFlashIntensity = 1f;
+
+        [Header("Squeeze Settings")]
+        [SerializeField] private Transform enemyTransform;
+        [SerializeField] private float squeezeDuration = 0.2f;
+        [SerializeField] private float squeezeScaleX = 0.7f;
+        [SerializeField] private float squeezeScaleY = 1.3f;
+
+        private Vector3 originalScale;
+        private Color originalColor = Color.white;
+        private Coroutine hitFlashCoroutine;
+        private Coroutine squeezeCoroutine;
+
+        private void Awake()
         {
-            enemyRenderer = GetComponent<MeshRenderer>();
+            if (enemyRenderer == null)
+            {
+                enemyRenderer = GetComponentInChildren<SpriteRenderer>();
+            }
+
+            if (enemyTransform == null)
+            {
+                enemyTransform = transform;
+            }
+
+            if (enemyRenderer == null)
+            {
+                Debug.LogError($"{nameof(BattleEnemyEffects)} requires a SpriteRenderer on {name}.", this);
+            }
+            else
+            {
+                originalColor = enemyRenderer.color;
+            }
+
+            originalScale = enemyTransform.localScale;
         }
 
-        if (enemyTransform == null)
+        /// <summary>Plays both hit-flash and squeeze feedback.</summary>
+        public void PlayHitEffects()
         {
-            enemyTransform = transform;
+            PlayHitFlash();
+            PlaySqueezeEffect();
         }
 
-        if (enemyRenderer != null)
+        /// <summary>Plays the temporary color flash on the enemy sprite.</summary>
+        public void PlayHitFlash()
         {
-            propertyBlock = new MaterialPropertyBlock();
-        }
-        else
-        {
-            Debug.LogError("Enemy Renderer não encontrado!");
-        }
+            if (enemyRenderer == null)
+            {
+                return;
+            }
 
-        originalScale = enemyTransform.localScale;
-    }
+            if (hitFlashCoroutine != null)
+            {
+                StopCoroutine(hitFlashCoroutine);
+            }
 
-    public void PlayHitEffects()
-    {
-        PlayHitFlash();
-        PlaySqueezeEffect();
-    }
-
-    public void PlayHitFlash()
-    {
-        if (enemyRenderer == null || propertyBlock == null)
-        {
-            Debug.LogError("PlayHitFlash: enemyRenderer ou propertyBlock é null!");
-            return;
+            hitFlashCoroutine = StartCoroutine(HitFlashCoroutine());
         }
 
-        if (hitFlashCoroutine != null)
+        /// <summary>Plays the temporary squash-and-stretch effect.</summary>
+        public void PlaySqueezeEffect()
         {
-            StopCoroutine(hitFlashCoroutine);
+            if (enemyTransform == null)
+            {
+                return;
+            }
+
+            if (squeezeCoroutine != null)
+            {
+                StopCoroutine(squeezeCoroutine);
+            }
+
+            squeezeCoroutine = StartCoroutine(SqueezeCoroutine());
         }
 
-        hitFlashCoroutine = StartCoroutine(HitFlashCoroutine());
-    }
-
-    public void PlaySqueezeEffect()
-    {
-        if (enemyTransform == null)
-            return;
-
-        if (squeezeCoroutine != null)
+        private IEnumerator HitFlashCoroutine()
         {
-            StopCoroutine(squeezeCoroutine);
+            float duration = Mathf.Max(hitFlashDuration, 0.01f);
+            float elapsedTime = 0f;
+            Color flashColor = Color.Lerp(originalColor, Color.red, Mathf.Clamp01(hitFlashIntensity));
+
+            while (elapsedTime < duration)
+            {
+                elapsedTime += Time.deltaTime;
+                float normalizedTime = Mathf.Clamp01(elapsedTime / duration);
+                enemyRenderer.color = Color.Lerp(flashColor, originalColor, normalizedTime);
+                yield return null;
+            }
+
+            enemyRenderer.color = originalColor;
+            hitFlashCoroutine = null;
         }
 
-        squeezeCoroutine = StartCoroutine(SqueezeCoroutine());
-    }
-
-    private IEnumerator HitFlashCoroutine()
-    {
-        float elapsedTime = 0f;
-
-        while (elapsedTime < hitFlashDuration)
+        private IEnumerator SqueezeCoroutine()
         {
-            elapsedTime += Time.deltaTime;
-            float normalizedTime = elapsedTime / hitFlashDuration;
-            float flashValue = Mathf.Lerp(hitFlashIntensity, 0f, normalizedTime);
-            
-            enemyRenderer.GetPropertyBlock(propertyBlock);
-            propertyBlock.SetFloat(HitEffectProperty, flashValue);
-            enemyRenderer.SetPropertyBlock(propertyBlock);
-            
-            yield return null;
+            float halfDuration = Mathf.Max(squeezeDuration * 0.5f, 0.01f);
+            float elapsedTime = 0f;
+
+            while (elapsedTime < halfDuration)
+            {
+                elapsedTime += Time.deltaTime;
+                float normalizedTime = Mathf.Clamp01(elapsedTime / halfDuration);
+                float scaleX = Mathf.Lerp(1f, squeezeScaleX, normalizedTime);
+                float scaleY = Mathf.Lerp(1f, squeezeScaleY, normalizedTime);
+                enemyTransform.localScale = new Vector3(originalScale.x * scaleX, originalScale.y * scaleY, originalScale.z);
+                yield return null;
+            }
+
+            elapsedTime = 0f;
+            while (elapsedTime < halfDuration)
+            {
+                elapsedTime += Time.deltaTime;
+                float normalizedTime = Mathf.Clamp01(elapsedTime / halfDuration);
+                float scaleX = Mathf.Lerp(squeezeScaleX, 1f, normalizedTime);
+                float scaleY = Mathf.Lerp(squeezeScaleY, 1f, normalizedTime);
+                enemyTransform.localScale = new Vector3(originalScale.x * scaleX, originalScale.y * scaleY, originalScale.z);
+                yield return null;
+            }
+
+            enemyTransform.localScale = originalScale;
+            squeezeCoroutine = null;
         }
 
-        enemyRenderer.GetPropertyBlock(propertyBlock);
-        propertyBlock.SetFloat(HitEffectProperty, 0f);
-        enemyRenderer.SetPropertyBlock(propertyBlock);
-        
-        hitFlashCoroutine = null;
-    }
-
-    private IEnumerator SqueezeCoroutine()
-    {
-        float halfDuration = squeezeDuration * 0.5f;
-        float elapsedTime = 0f;
-
-        while (elapsedTime < halfDuration)
+        private void OnDestroy()
         {
-            elapsedTime += Time.deltaTime;
-            float normalizedTime = elapsedTime / halfDuration;
-            float scaleX = Mathf.Lerp(1f, squeezeScaleX, normalizedTime);
-            float scaleY = Mathf.Lerp(1f, squeezeScaleY, normalizedTime);
-            
-            enemyTransform.localScale = new Vector3(
-                originalScale.x * scaleX,
-                originalScale.y * scaleY,
-                originalScale.z
-            );
-            
-            yield return null;
-        }
-
-        elapsedTime = 0f;
-
-        while (elapsedTime < halfDuration)
-        {
-            elapsedTime += Time.deltaTime;
-            float normalizedTime = elapsedTime / halfDuration;
-            float scaleX = Mathf.Lerp(squeezeScaleX, 1f, normalizedTime);
-            float scaleY = Mathf.Lerp(squeezeScaleY, 1f, normalizedTime);
-            
-            enemyTransform.localScale = new Vector3(
-                originalScale.x * scaleX,
-                originalScale.y * scaleY,
-                originalScale.z
-            );
-            
-            yield return null;
-        }
-
-        enemyTransform.localScale = originalScale;
-        squeezeCoroutine = null;
-    }
-
-    private void OnDestroy()
-    {
-        if (enemyRenderer != null && propertyBlock != null)
-        {
-            enemyRenderer.GetPropertyBlock(propertyBlock);
-            propertyBlock.SetFloat(HitEffectProperty, 0f);
-            enemyRenderer.SetPropertyBlock(propertyBlock);
+            if (enemyRenderer != null)
+            {
+                enemyRenderer.color = originalColor;
+            }
         }
     }
-}
-
-
 }

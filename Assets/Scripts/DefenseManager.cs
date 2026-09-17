@@ -1,251 +1,162 @@
-namespace HorrorRPG.Battle
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
+using System;
+using System.Collections.Generic;
 using HorrorRPG.Core;
 using HorrorRPG.Input;
 using HorrorRPG.Player;
-
-
-
 using UnityEngine;
-using System.Collections.Generic;
 
-public class DefenseManager : MonoBehaviour
+namespace HorrorRPG.Battle
 {
-    public static DefenseManager Instance { get; private set; }
-
-    [Header("Defense Settings")]
-    [SerializeField] private float globalCooldown = 1.5f;
-
-    [Header("Input Settings")]
-    private Dictionary<DefensePosition, DefenseRegionData> defenseRegions;
-    private float globalCooldownTimer;
-    private bool defenseEnabled;
-    private GameInputReader inputReader;
-
-    public bool IsDefenseEnabled => defenseEnabled;
-
-    private void Awake()
+    public readonly struct DefenseRequest
     {
-        if (Instance == null)
+        public DefenseRequest(float activeDuration)
         {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-            return;
+            ActiveDuration = activeDuration;
         }
 
-        InitializeDefenseRegions();
+        public float ActiveDuration { get; }
     }
 
-    private void OnEnable()
+    public readonly struct DefenseResolution
     {
-        inputReader = FindFirstObjectByType<GameInputReader>();
-        if (inputReader == null)
+        public DefenseResolution(DefensePosition position, int damage, DefenseType type)
         {
-            return;
+            Position = position;
+            Damage = Mathf.Max(0, damage);
+            Type = type;
         }
 
-        inputReader.DefendLeftPerformed += HandleLeftDefense;
-        inputReader.DefendUpPerformed += HandleUpDefense;
-        inputReader.DefendRightPerformed += HandleRightDefense;
+        public DefensePosition Position { get; }
+        public int Damage { get; }
+        public DefenseType Type { get; }
     }
 
-    private void OnDisable()
+    /// <summary>Resolves defense timing for the active enemy attack.</summary>
+    public class DefenseManager : MonoBehaviour, IGameContextReceiver
     {
-        if (inputReader == null)
+        private const float DefaultActiveDuration = 1f;
+
+        [SerializeField] private float globalCooldown = 1.5f;
+        [SerializeField] private float defenseActiveDuration = DefaultActiveDuration;
+        [SerializeField] private DefenseEffectsManager defenseEffects;
+        [SerializeField] private HandAnimationManager handAnimationManager;
+
+        private readonly Dictionary<DefensePosition, DefenseRegionData> defenseRegions = new Dictionary<DefensePosition, DefenseRegionData>();
+        private GameInputReader inputReader;
+        private float globalCooldownTimer;
+        private bool defenseEnabled;
+        private bool subscribed;
+
+        public bool IsDefenseEnabled => defenseEnabled;
+
+        /// <summary>Injects typed defense input for this scene.</summary>
+        public void Initialize(GameContext context)
         {
-            return;
+            inputReader = context?.InputReader ?? throw new ArgumentNullException(nameof(context));
+            Subscribe();
         }
 
-        inputReader.DefendLeftPerformed -= HandleLeftDefense;
-        inputReader.DefendUpPerformed -= HandleUpDefense;
-        inputReader.DefendRightPerformed -= HandleRightDefense;
-    }
-
-    private void InitializeDefenseRegions()
-    {
-        defenseRegions = new Dictionary<DefensePosition, DefenseRegionData>
+        /// <summary>Ends defense and releases input callbacks.</summary>
+        public void Deinitialize()
         {
-            { DefensePosition.Left, new DefenseRegionData(DefensePosition.Left) },
-            { DefensePosition.Up, new DefenseRegionData(DefensePosition.Up) },
-            { DefensePosition.Right, new DefenseRegionData(DefensePosition.Right) }
-        };
-    }
-
-    private void Update()
-    {
-        if (!defenseEnabled)
-            return;
-
-        UpdateGlobalCooldown();
-        UpdateDefenseTimers();
-    }
-
-    private void UpdateGlobalCooldown()
-    {
-        if (globalCooldownTimer > 0f)
-        {
-            globalCooldownTimer -= Time.deltaTime;
-        }
-    }
-
-    private void UpdateDefenseTimers()
-    {
-        foreach (var region in defenseRegions.Values)
-        {
-            region.UpdateTimer(Time.deltaTime);
-        }
-    }
-
-    private void HandleLeftDefense()
-    {
-        TryActivateDefense(DefensePosition.Left);
-    }
-
-    private void HandleUpDefense()
-    {
-        TryActivateDefense(DefensePosition.Up);
-    }
-
-    private void HandleRightDefense()
-    {
-        TryActivateDefense(DefensePosition.Right);
-    }
-
-    private void TryActivateDefense(DefensePosition position)
-    {
-        if (!defenseEnabled || globalCooldownTimer > 0f)
-        {
-            return;
+            End();
+            Unsubscribe();
+            inputReader = null;
         }
 
-        DefenseRegionData region = defenseRegions[position];
-        if (region.isActive)
+        /// <summary>Begins a defense request and resets all three regions.</summary>
+        public void Begin(DefenseRequest request)
         {
-            return;
+            float duration = request.ActiveDuration > 0f ? request.ActiveDuration : defenseActiveDuration;
+            defenseRegions.Clear();
+            defenseRegions.Add(DefensePosition.Left, new DefenseRegionData(DefensePosition.Left, duration));
+            defenseRegions.Add(DefensePosition.Up, new DefenseRegionData(DefensePosition.Up, duration));
+            defenseRegions.Add(DefensePosition.Right, new DefenseRegionData(DefensePosition.Right, duration));
+            globalCooldownTimer = 0f;
+            defenseEnabled = true;
         }
 
-        region.Activate();
-        globalCooldownTimer = globalCooldown;
-        PlayDefenseAnimation(position);
-        Debug.Log($"Defesa {position} ativada! Timer iniciado.");
-    }
-
-    private void PlayDefenseAnimation(DefensePosition position)
-    {
-        DefenseEffectsManager.Instance?.TriggerEffect(position);
-        
-        if (HandAnimationManager.Instance != null)
+        /// <summary>Resolves projectile damage against a defense region and consumes that region.</summary>
+        public DefenseResolution Resolve(DefensePosition position, int damage)
         {
+            if (!defenseRegions.TryGetValue(position, out DefenseRegionData region) || !region.IsActive)
+                return new DefenseResolution(position, damage, DefenseType.None);
+
+            float multiplier = region.GetDamageMultiplier();
+            int finalDamage = Mathf.CeilToInt(Mathf.Max(0, damage) * multiplier);
+            DefenseType type = multiplier <= 0f ? DefenseType.Perfect : multiplier < 1f ? DefenseType.Partial : DefenseType.None;
+            region.Reset();
+            return new DefenseResolution(position, finalDamage, type);
+        }
+
+        /// <summary>Ends defense and clears every active timing region and effect.</summary>
+        public void End()
+        {
+            defenseEnabled = false;
+            foreach (DefenseRegionData region in defenseRegions.Values) region.Reset();
+            defenseRegions.Clear();
+            globalCooldownTimer = 0f;
+            defenseEffects?.HideAllEffects();
+        }
+
+        private void OnEnable() => Subscribe();
+        private void OnDisable() => Unsubscribe();
+
+        private void Update()
+        {
+            if (!defenseEnabled) return;
+            globalCooldownTimer = Mathf.Max(0f, globalCooldownTimer - Time.deltaTime);
+            foreach (DefenseRegionData region in defenseRegions.Values) region.UpdateTimer(Time.deltaTime);
+        }
+
+        private void TryActivateDefense(DefensePosition position)
+        {
+            if (!defenseEnabled || globalCooldownTimer > 0f) return;
+            if (!defenseRegions.TryGetValue(position, out DefenseRegionData region) || region.IsActive) return;
+            region.Activate();
+            globalCooldownTimer = globalCooldown;
+            defenseEffects?.TriggerEffect(position);
+            if (handAnimationManager == null) return;
             switch (position)
             {
                 case DefensePosition.Left:
-                    HandAnimationManager.Instance.PlayReachAnimationLeftHand();
+                    handAnimationManager.PlayReachAnimationLeftHand();
                     break;
                 case DefensePosition.Up:
-                    HandAnimationManager.Instance.PlayReachAnimation();
+                    handAnimationManager.PlayReachAnimation();
                     break;
                 case DefensePosition.Right:
-                    HandAnimationManager.Instance.PlayReachAnimationRightHand();
+                    handAnimationManager.PlayReachAnimationRightHand();
                     break;
             }
         }
-    }
 
-    public void EnableDefense(bool enable)
-    {
-        defenseEnabled = enable;
-        
-        if (!enable)
+        private void Subscribe()
         {
-            ResetAllDefenses();
-        }
-        
-        Debug.Log($"Sistema de defesa {(enable ? "ativado" : "desativado")}");
-    }
-
-    public int OnProjectileHit(DefensePosition position, int baseDamage, out DefenseType defenseType)
-    {
-        if (!defenseRegions.ContainsKey(position))
-        {
-            Debug.LogError($"Posição de defesa inválida: {position}");
-            defenseType = DefenseType.None;
-            return baseDamage;
+            if (!isActiveAndEnabled || inputReader == null || subscribed) return;
+            inputReader.DefendLeftPerformed += HandleLeftDefense;
+            inputReader.DefendUpPerformed += HandleUpDefense;
+            inputReader.DefendRightPerformed += HandleRightDefense;
+            subscribed = true;
         }
 
-        DefenseRegionData region = defenseRegions[position];
-        
-        if (!region.HasDefense())
+        private void Unsubscribe()
         {
-            Debug.Log($"Projétil atingiu {position} - Sem defesa! Dano total: {baseDamage}");
-            defenseType = DefenseType.None;
-            return baseDamage;
+            if (!subscribed || inputReader == null) return;
+            inputReader.DefendLeftPerformed -= HandleLeftDefense;
+            inputReader.DefendUpPerformed -= HandleUpDefense;
+            inputReader.DefendRightPerformed -= HandleRightDefense;
+            subscribed = false;
         }
 
-        float damageMultiplier = region.GetDamageMultiplier();
-        int finalDamage = Mathf.CeilToInt(baseDamage * damageMultiplier);
-        
-        float normalizedTime = region.defenseTimer / 1.0f;
-        float defensePercent = (1.0f - damageMultiplier) * 100f;
-        
-        defenseType = GetDefenseType(damageMultiplier);
-        
-        string timingQuality = GetTimingQuality(normalizedTime);
-        Debug.Log($"Projétil atingiu {position} - {timingQuality} (Timer: {normalizedTime:P0}) - Bloqueio {defensePercent:F0}% - Dano: {finalDamage}/{baseDamage}");
-        
-        region.Reset();
-        
-        return finalDamage;
-    }
+        private void HandleLeftDefense() => TryActivateDefense(DefensePosition.Left);
+        private void HandleUpDefense() => TryActivateDefense(DefensePosition.Up);
+        private void HandleRightDefense() => TryActivateDefense(DefensePosition.Right);
 
-    private DefenseType GetDefenseType(float damageMultiplier)
-    {
-        if (damageMultiplier <= 0.0f)
-            return DefenseType.Perfect;
-        else if (damageMultiplier < 1.0f)
-            return DefenseType.Partial;
-        else
-            return DefenseType.None;
-    }
-
-    private string GetTimingQuality(float normalizedTime)
-    {
-        if (normalizedTime < 0.15f) return "MUITO CEDO";
-        if (normalizedTime < 0.375f) return "CEDO";
-        if (normalizedTime < 0.625f) return "PERFEITO";
-        if (normalizedTime < 0.85f) return "TARDE";
-        return "MUITO TARDE";
-    }
-
-    public void ResetAllDefenses()
-    {
-        foreach (var region in defenseRegions.Values)
+        private void OnValidate()
         {
-            region.Reset();
+            globalCooldown = Mathf.Max(0f, globalCooldown);
+            defenseActiveDuration = Mathf.Max(0.01f, defenseActiveDuration);
         }
-        globalCooldownTimer = 0f;
     }
-
-    public DefenseRegionData GetRegionData(DefensePosition position)
-    {
-        if (defenseRegions.ContainsKey(position))
-        {
-            return defenseRegions[position];
-        }
-        return null;
-    }
-
-    public float GetGlobalCooldownRemaining()
-    {
-        return Mathf.Max(0f, globalCooldownTimer);
-    }
-}
-
-
 }

@@ -1,11 +1,6 @@
 namespace HorrorRPG.Presentation
 {
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
+
 
 
 using UnityEngine;
@@ -63,8 +58,6 @@ public class AutoTextureTiling : MonoBehaviour
         );
 
         instanceMaterial.mainTextureScale = tiling;
-        
-        Debug.Log($"{gameObject.name}: Tiling ajustado para {tiling} (tamanho: {objectSize})");
     }
 
     private Vector3 CalculateObjectSize()

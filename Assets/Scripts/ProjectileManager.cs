@@ -1,292 +1,268 @@
-namespace HorrorRPG.Battle
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
-
-
-using UnityEngine;
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
 
-public class ProjectileManager : MonoBehaviour
+namespace HorrorRPG.Battle
 {
-    public static ProjectileManager Instance { get; private set; }
+    public enum ProjectileAttackStatus { Completed, InvalidConfiguration, Cancelled }
 
-    [Header("Spawn Settings")]
-    [SerializeField] private Transform spawnPoint;
-
-    [Header("Defense Targets")]
-    [SerializeField] private Transform leftTarget;
-    [SerializeField] private Transform upTarget;
-    [SerializeField] private Transform rightTarget;
-
-    [Header("Pool Settings")]
-    [SerializeField] private GameObject projectilePrefab;
-    [SerializeField] private int poolSize = 10;
-
-    private List<BattleProjectile> projectilePool = new List<BattleProjectile>();
-    private BattleProjectile activeProjectile;
-    private Dictionary<BattleProjectile, System.Action<int, DefenseType>> projectileCallbacks = new Dictionary<BattleProjectile, System.Action<int, DefenseType>>();
-    private System.Action<int, DefenseType> onProjectileResolved;
-
-    private void Awake()
+    public readonly struct ProjectileAttackHandle
     {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        InitializePool();
+        internal ProjectileAttackHandle(Guid id) => Id = id;
+        internal Guid Id { get; }
     }
 
-    private void InitializePool()
+    public readonly struct ProjectileResolution
     {
-        for (int i = 0; i < poolSize; i++)
+        public ProjectileResolution(DefensePosition position, int damage, DefenseType defenseType)
         {
-            GameObject obj = Instantiate(projectilePrefab, transform);
-            obj.SetActive(false);
-            BattleProjectile projectile = obj.GetComponent<BattleProjectile>();
-            if (projectile != null)
+            Position = position;
+            Damage = Mathf.Max(0, damage);
+            DefenseType = defenseType;
+        }
+
+        public DefensePosition Position { get; }
+        public int Damage { get; }
+        public DefenseType DefenseType { get; }
+    }
+
+    public sealed class ProjectileAttackResult
+    {
+        public ProjectileAttackResult(ProjectileAttackStatus status, IReadOnlyList<ProjectileResolution> resolutions)
+        {
+            Status = status;
+            Resolutions = resolutions ?? Array.Empty<ProjectileResolution>();
+        }
+
+        public ProjectileAttackStatus Status { get; }
+        public IReadOnlyList<ProjectileResolution> Resolutions { get; }
+    }
+
+    /// <summary>Owns pooled projectile executions and one completion callback per attack.</summary>
+    public class ProjectileManager : MonoBehaviour
+    {
+        [Header("Spawn Settings")]
+        [SerializeField] private Transform spawnPoint;
+        [Header("Defense Targets")]
+        [SerializeField] private Transform leftTarget;
+        [SerializeField] private Transform upTarget;
+        [SerializeField] private Transform rightTarget;
+        [Header("Pool Settings")]
+        [SerializeField] private GameObject projectilePrefab;
+        [SerializeField] private int poolSize = 10;
+        [SerializeField] private DefenseManager defenseManager;
+
+        private readonly List<BattleProjectile> projectilePool = new List<BattleProjectile>();
+        private readonly Dictionary<Guid, ProjectileExecution> executions = new Dictionary<Guid, ProjectileExecution>();
+        private readonly Dictionary<BattleProjectile, ProjectileExecution> projectileOwners = new Dictionary<BattleProjectile, ProjectileExecution>();
+
+        private void Awake()
+        {
+            if (defenseManager == null) defenseManager = GetComponent<DefenseManager>();
+            InitializePool();
+        }
+
+        /// <summary>Executes a configured attack and invokes resolution and completion callbacks.</summary>
+        public ProjectileAttackHandle Execute(AttackData attack, int baseDamage, Action<ProjectileResolution> resolved, Action<ProjectileAttackResult> completed)
+        {
+            if (resolved == null) throw new ArgumentNullException(nameof(resolved));
+            if (completed == null) throw new ArgumentNullException(nameof(completed));
+            var handle = new ProjectileAttackHandle(Guid.NewGuid());
+            if (!IsExecutionValid(attack))
             {
-                projectilePool.Add(projectile);
-            }
-        }
-    }
-
-    private void Update()
-    {
-    }
-
-    public IEnumerator ExecuteAttack(AttackData attackData, int baseDamage)
-    {
-        if (attackData == null || !attackData.IsValid())
-        {
-            Debug.LogError("AttackData inválido!");
-            onProjectileResolved?.Invoke(baseDamage, DefenseType.None);
-            yield break;
-        }
-
-        List<BattleProjectile> activeProjectiles = new List<BattleProjectile>();
-        List<bool> projectileResolved = new List<bool>();
-
-        for (int i = 0; i < attackData.projectileSpawns.Count; i++)
-        {
-            projectileResolved.Add(false);
-        }
-
-        for (int i = 0; i < attackData.projectileSpawns.Count; i++)
-        {
-            ProjectileSpawnData spawnData = attackData.projectileSpawns[i];
-            
-            if (spawnData.spawnDelay > 0f)
-            {
-                yield return new WaitForSeconds(spawnData.spawnDelay);
+                completed(new ProjectileAttackResult(ProjectileAttackStatus.InvalidConfiguration, Array.Empty<ProjectileResolution>()));
+                return handle;
             }
 
-            int projectileDamage = Mathf.RoundToInt(baseDamage * spawnData.damageMultiplier);
-            int projectileIndex = i;
+            var execution = new ProjectileExecution(handle.Id, attack.GetProjectileCount(), resolved, completed);
+            executions.Add(handle.Id, execution);
+            execution.SpawnCoroutine = StartCoroutine(SpawnExecution(execution, attack, Mathf.Max(0, baseDamage)));
+            return handle;
+        }
 
-            System.Action<int, DefenseType> projectileCallback = (damage, defenseType) =>
+        /// <summary>Cancels one valid attack execution and returns its unresolved projectiles.</summary>
+        public void Cancel(ProjectileAttackHandle handle)
+        {
+            if (!executions.TryGetValue(handle.Id, out ProjectileExecution execution) || execution.Finished) return;
+            if (execution.SpawnCoroutine != null) StopCoroutine(execution.SpawnCoroutine);
+            foreach (BattleProjectile projectile in new List<BattleProjectile>(execution.ActiveProjectiles)) projectile.ReturnToPool();
+            FinishExecution(execution, ProjectileAttackStatus.Cancelled);
+        }
+
+        private void InitializePool()
+        {
+            if (projectilePrefab == null) return;
+            for (int index = 0; index < Mathf.Max(0, poolSize); index++) CreatePooledProjectile(false);
+        }
+
+        private IEnumerator SpawnExecution(ProjectileExecution execution, AttackData attack, int baseDamage)
+        {
+            foreach (ProjectileSpawnData spawnData in attack.projectileSpawns)
             {
-                projectileResolved[projectileIndex] = true;
-                onProjectileResolved?.Invoke(damage, defenseType);
-            };
-
-            StartCoroutine(SpawnSingleProjectile(spawnData.projectileConfig, projectileDamage, projectileCallback, activeProjectiles));
-        }
-
-        while (!AllProjectilesResolved(projectileResolved))
-        {
-            yield return null;
-        }
-
-        activeProjectiles.Clear();
-    }
-
-    private bool AllProjectilesResolved(List<bool> resolvedStates)
-    {
-        foreach (bool resolved in resolvedStates)
-        {
-            if (!resolved)
-                return false;
-        }
-        return true;
-    }
-
-    private IEnumerator SpawnSingleProjectile(ProjectileConfig config, int damage, System.Action<int, DefenseType> callback, List<BattleProjectile> activeList)
-    {
-        BattleProjectile projectile = GetProjectileFromPool();
-        if (projectile == null)
-        {
-            Debug.LogError("Nenhum projétil disponível no pool!");
-            callback?.Invoke(damage, DefenseType.None);
-            yield break;
-        }
-
-        Vector3 spawnPosition = spawnPoint != null ? spawnPoint.position : Vector3.zero;
-
-        projectile.gameObject.SetActive(true);
-        projectile.Initialize(config, spawnPosition, damage);
-        
-        projectileCallbacks[projectile] = callback;
-        activeList.Add(projectile);
-    }
-
-    public IEnumerator ExecuteProjectileAttack(ProjectileConfig config, int damage)
-    {
-        BattleProjectile projectile = GetProjectileFromPool();
-        if (projectile == null)
-        {
-            Debug.LogError("Nenhum projétil disponível no pool!");
-            onProjectileResolved?.Invoke(damage, DefenseType.None);
-            yield break;
-        }
-
-        Vector3 spawnPosition = spawnPoint != null ? spawnPoint.position : Vector3.zero;
-
-        projectile.gameObject.SetActive(true);
-        projectile.Initialize(config, spawnPosition, damage);
-        activeProjectile = projectile;
-
-        while (activeProjectile != null && activeProjectile.CurrentState == ProjectileState.Looping)
-        {
-            yield return null;
-        }
-
-        while (activeProjectile != null && 
-               activeProjectile.CurrentState == ProjectileState.Traveling)
-        {
-            yield return null;
-        }
-
-        activeProjectile = null;
-    }
-
-    public void OnProjectileReadyToAttack(BattleProjectile projectile)
-    {
-        bool isFromNewSystem = projectileCallbacks.ContainsKey(projectile);
-        bool isFromOldSystem = projectile == activeProjectile;
-        
-        if (!isFromNewSystem && !isFromOldSystem)
-            return;
-
-        DefensePosition randomPosition = (DefensePosition)Random.Range(0, 3);
-        Transform target = GetTargetTransform(randomPosition);
-
-        if (target != null)
-        {
-            projectile.StartTravelToTarget(target, randomPosition);
-        }
-        else
-        {
-            Debug.LogError("Target transform não encontrado!");
-            
-            if (isFromNewSystem)
-            {
-                if (projectileCallbacks.TryGetValue(projectile, out var callback))
-                {
-                    callback?.Invoke(0, DefenseType.None);
-                    projectileCallbacks.Remove(projectile);
-                }
+                if (spawnData.spawnDelay > 0f) yield return new WaitForSeconds(spawnData.spawnDelay);
+                if (execution.Finished) yield break;
+                int damage = Mathf.RoundToInt(baseDamage * spawnData.damageMultiplier);
+                SpawnProjectile(execution, spawnData.projectileConfig, damage);
             }
-            
-            ReturnProjectileToPool(projectile);
-        }
-    }
-
-    public void OnProjectileReachedTarget(BattleProjectile projectile)
-    {
-        bool isFromNewSystem = projectileCallbacks.ContainsKey(projectile);
-        bool isFromOldSystem = projectile == activeProjectile;
-        
-        if (!isFromNewSystem && !isFromOldSystem)
-            return;
-
-        DefensePosition position = projectile.TargetPosition;
-        int baseDamage = projectile.DamageAmount;
-        
-        int finalDamage = baseDamage;
-        DefenseType defenseType = DefenseType.None;
-        
-        if (DefenseManager.Instance != null)
-        {
-            finalDamage = DefenseManager.Instance.OnProjectileHit(position, baseDamage, out defenseType);
+            execution.SpawningComplete = true;
+            TryCompleteExecution(execution);
         }
 
-        projectile.HitTarget();
-        
-        if (isFromNewSystem)
+        private void SpawnProjectile(ProjectileExecution execution, ProjectileConfig config, int damage)
         {
-            if (projectileCallbacks.TryGetValue(projectile, out var callback))
+            BattleProjectile projectile = GetProjectileFromPool();
+            if (projectile == null)
             {
-                callback?.Invoke(finalDamage, defenseType);
-                projectileCallbacks.Remove(projectile);
+                ProjectileResolution resolution = new ProjectileResolution(DefensePosition.Up, damage, DefenseType.None);
+                execution.Resolutions.Add(resolution);
+                execution.ResolvedCount++;
+                execution.Resolved?.Invoke(resolution);
+                TryCompleteExecution(execution);
+                return;
             }
-        }
-        else
-        {
-            onProjectileResolved?.Invoke(finalDamage, defenseType);
-        }
-    }
 
-    private Transform GetTargetTransform(DefensePosition position)
-    {
-        switch (position)
-        {
-            case DefensePosition.Left:
-                return leftTarget;
-            case DefensePosition.Up:
-                return upTarget;
-            case DefensePosition.Right:
-                return rightTarget;
-            default:
-                return null;
+            projectile.gameObject.SetActive(true);
+            execution.ActiveProjectiles.Add(projectile);
+            projectileOwners.Add(projectile, execution);
+            Vector3 center = spawnPoint != null ? spawnPoint.position : transform.position;
+            projectile.Initialize(new ProjectileExecutionContext(config, center, damage, HandleProjectileReady, HandleProjectileReachedTarget, ReturnProjectileToPool));
         }
-    }
 
-    private BattleProjectile GetProjectileFromPool()
-    {
-        foreach (BattleProjectile projectile in projectilePool)
+        private void HandleProjectileReady(BattleProjectile projectile)
         {
-            if (!projectile.gameObject.activeInHierarchy)
+            if (!projectileOwners.ContainsKey(projectile))
             {
-                return projectile;
+                projectile.ReturnToPool();
+                return;
             }
+            DefensePosition position = (DefensePosition)UnityEngine.Random.Range(0, 3);
+            Transform target = GetTarget(position);
+            if (target == null)
+            {
+                ResolveProjectile(projectile, position, DefenseType.None, projectile.DamageAmount);
+                return;
+            }
+            projectile.BeginTravel(target, position);
         }
 
-        GameObject newObj = Instantiate(projectilePrefab, transform);
-        BattleProjectile newProjectile = newObj.GetComponent<BattleProjectile>();
-        if (newProjectile != null)
+        private void HandleProjectileReachedTarget(BattleProjectile projectile)
         {
-            projectilePool.Add(newProjectile);
-            return newProjectile;
+            if (!projectileOwners.ContainsKey(projectile)) return;
+            DefenseResolution defense = defenseManager != null
+                ? defenseManager.Resolve(projectile.TargetPosition, projectile.DamageAmount)
+                : new DefenseResolution(projectile.TargetPosition, projectile.DamageAmount, DefenseType.None);
+            ResolveProjectile(projectile, defense.Position, defense.Type, defense.Damage);
         }
 
-        return null;
-    }
-
-    public void ReturnProjectileToPool(BattleProjectile projectile)
-    {
-        if (projectile != null)
+        private void ResolveProjectile(BattleProjectile projectile, DefensePosition position, DefenseType defenseType, int damage)
         {
+            if (!projectileOwners.TryGetValue(projectile, out ProjectileExecution execution)) return;
+            projectileOwners.Remove(projectile);
+            execution.ActiveProjectiles.Remove(projectile);
+            execution.Resolutions.Add(new ProjectileResolution(position, damage, defenseType));
+            execution.ResolvedCount++;
+            execution.Resolved?.Invoke(execution.Resolutions[execution.Resolutions.Count - 1]);
+            projectile.HitTarget();
+            TryCompleteExecution(execution);
+        }
+
+        private void ReturnProjectileToPool(BattleProjectile projectile)
+        {
+            if (projectileOwners.TryGetValue(projectile, out ProjectileExecution execution))
+            {
+                projectileOwners.Remove(projectile);
+                execution.ActiveProjectiles.Remove(projectile);
+            }
             projectile.gameObject.SetActive(false);
         }
+
+        private void TryCompleteExecution(ProjectileExecution execution)
+        {
+            if (execution.SpawningComplete && execution.ResolvedCount >= execution.ExpectedCount)
+                FinishExecution(execution, ProjectileAttackStatus.Completed);
+        }
+
+        private void FinishExecution(ProjectileExecution execution, ProjectileAttackStatus status)
+        {
+            if (execution.Finished) return;
+            execution.Finished = true;
+            executions.Remove(execution.Id);
+            Action<ProjectileAttackResult> callback = execution.Completed;
+            execution.Completed = null;
+            callback?.Invoke(new ProjectileAttackResult(status, execution.Resolutions.ToArray()));
+        }
+
+        private BattleProjectile GetProjectileFromPool()
+        {
+            foreach (BattleProjectile projectile in projectilePool)
+            {
+                if (!projectile.gameObject.activeSelf) return projectile;
+            }
+            return CreatePooledProjectile(true);
+        }
+
+        private BattleProjectile CreatePooledProjectile(bool active)
+        {
+            if (projectilePrefab == null) return null;
+            GameObject instance = Instantiate(projectilePrefab, transform);
+            if (!instance.TryGetComponent(out BattleProjectile projectile))
+            {
+                Destroy(instance);
+                return null;
+            }
+            projectilePool.Add(projectile);
+            instance.SetActive(active);
+            return projectile;
+        }
+
+        private Transform GetTarget(DefensePosition position)
+        {
+            return position switch
+            {
+                DefensePosition.Left => leftTarget,
+                DefensePosition.Up => upTarget,
+                DefensePosition.Right => rightTarget,
+                _ => null
+            };
+        }
+
+        private bool IsExecutionValid(AttackData attack)
+        {
+            if (attack == null || projectilePrefab == null || attack.projectileSpawns == null || attack.projectileSpawns.Count == 0) return false;
+            foreach (ProjectileSpawnData spawnData in attack.projectileSpawns)
+            {
+                if (spawnData == null || spawnData.projectileConfig == null || spawnData.damageMultiplier < 0f) return false;
+            }
+            return true;
+        }
+
+        private void OnDisable()
+        {
+            foreach (ProjectileExecution execution in new List<ProjectileExecution>(executions.Values))
+                Cancel(new ProjectileAttackHandle(execution.Id));
+        }
+
+        private sealed class ProjectileExecution
+        {
+            public ProjectileExecution(Guid id, int expectedCount, Action<ProjectileResolution> resolved, Action<ProjectileAttackResult> completed)
+            {
+                Id = id;
+                ExpectedCount = expectedCount;
+                Resolved = resolved;
+                Completed = completed;
+            }
+
+            public Guid Id { get; }
+            public int ExpectedCount { get; }
+            public int ResolvedCount { get; set; }
+            public bool SpawningComplete { get; set; }
+            public bool Finished { get; set; }
+            public Coroutine SpawnCoroutine { get; set; }
+            public Action<ProjectileResolution> Resolved { get; }
+            public Action<ProjectileAttackResult> Completed { get; set; }
+            public List<ProjectileResolution> Resolutions { get; } = new List<ProjectileResolution>();
+            public HashSet<BattleProjectile> ActiveProjectiles { get; } = new HashSet<BattleProjectile>();
+        }
     }
-
-    public void SetDamageCallback(System.Action<int, DefenseType> callback)
-    {
-        onProjectileResolved = callback;
-    }
-}
-
-
 }

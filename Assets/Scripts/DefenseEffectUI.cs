@@ -1,11 +1,6 @@
 namespace HorrorRPG.Presentation
 {
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
+
 
 
 using UnityEngine;
@@ -25,11 +20,13 @@ public class DefenseEffectUI : MonoBehaviour
 
     private void Awake()
     {
-        effectObject.SetActive(false);
+        if (effectObject != null) effectObject.SetActive(false);
     }
 
     public void Trigger()
     {
+        if (effectObject == null) return;
+
         if (activeEffectCoroutine != null)
         {
             StopCoroutine(activeEffectCoroutine);
@@ -57,8 +54,8 @@ public class DefenseEffectUI : MonoBehaviour
             StopCoroutine(activeEffectCoroutine);
             activeEffectCoroutine = null;
         }
-        
-        gameObject.SetActive(false);
+
+        if (effectObject != null) effectObject.SetActive(false);
     }
 }
 

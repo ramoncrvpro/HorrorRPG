@@ -1,48 +1,39 @@
+using UnityEngine;
+using UnityEngine.Serialization;
+
 namespace HorrorRPG.Inventory
 {
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
+    public enum ConsumableEffectType { HealHealth, IncreaseDamage, DecreaseMarkerSpeed }
 
-
-using UnityEngine;
-
-public enum ConsumableEffectType
-{
-    HealHealth,
-    IncreaseDamage,
-    DecreaseMarkerSpeed
-}
-
-[CreateAssetMenu(fileName = "New Consumable", menuName = "Inventory/Consumable")]
-public class ConsumableData : ItemData
-{
-    [Header("Consumable Properties")]
-    public ConsumableEffectType effectType = ConsumableEffectType.HealHealth;
-    public int effectValue;
-    public float effectDuration = 1f;
-
-    public string GetEffectDescription()
+    [CreateAssetMenu(fileName = "New Consumable", menuName = "Inventory/Consumable")]
+    public class ConsumableData : ItemData
     {
-        switch (effectType)
+        [Header("Consumable Properties")]
+        [SerializeField, FormerlySerializedAs("effectType")] private ConsumableEffectType effectTypeValue = ConsumableEffectType.HealHealth;
+        [SerializeField, FormerlySerializedAs("effectValue")] private int effectValueValue;
+        [SerializeField, FormerlySerializedAs("effectDuration")] private float effectDurationValue = 1f;
+
+        public ConsumableEffectType effectType => effectTypeValue;
+        public int effectValue => effectValueValue;
+        public float effectDuration => effectDurationValue;
+
+        /// <summary>Returns a localized description for the configured effect.</summary>
+        public string GetEffectDescription()
         {
-            case ConsumableEffectType.HealHealth:
-                return $"Restaura {effectValue} pontos de vida";
-            
-            case ConsumableEffectType.IncreaseDamage:
-                return $"Aumenta o dano em {effectValue} no próximo ataque";
-            
-            case ConsumableEffectType.DecreaseMarkerSpeed:
-                return $"Reduz a velocidade do marker em {effectValue}%";
-            
-            default:
-                return "Efeito desconhecido";
+            return effectTypeValue switch
+            {
+                ConsumableEffectType.HealHealth => $"Restaura {effectValueValue} pontos de vida",
+                ConsumableEffectType.IncreaseDamage => $"Aumenta o dano em {effectValueValue} no próximo ataque",
+                ConsumableEffectType.DecreaseMarkerSpeed => $"Reduz a velocidade do marker em {effectValueValue}%",
+                _ => "Efeito desconhecido"
+            };
+        }
+
+        protected override void OnValidate()
+        {
+            base.OnValidate();
+            effectValueValue = Mathf.Max(0, effectValueValue);
+            effectDurationValue = Mathf.Max(0f, effectDurationValue);
         }
     }
-}
-
-
 }

@@ -1,61 +1,51 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Serialization;
+
 namespace HorrorRPG.Battle
 {
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
-
-
-using UnityEngine;
-using System.Collections.Generic;
-
-[CreateAssetMenu(fileName = "New Attack", menuName = "Battle/Attack Data")]
-public class AttackData : ScriptableObject
-{
-    [Header("Attack Info")]
-    [Tooltip("Nome do ataque para identificação")]
-    public string attackName = "New Attack";
-    
-    [Header("Projectiles")]
-    [Tooltip("Lista de projéteis que serão spawnados neste ataque")]
-    public List<ProjectileSpawnData> projectileSpawns = new List<ProjectileSpawnData>();
-    
-    public float GetTotalAttackDuration()
+    [CreateAssetMenu(fileName = "New Attack", menuName = "Battle/Attack Data")]
+    public class AttackData : ScriptableObject
     {
-        if (projectileSpawns == null || projectileSpawns.Count == 0)
-            return 0f;
-        
-        float maxDelay = 0f;
-        foreach (var spawn in projectileSpawns)
+        [SerializeField] private string stableId;
+        [Header("Attack Info")]
+        [SerializeField, FormerlySerializedAs("attackName")] private string attackNameValue = "New Attack";
+        [Header("Projectiles")]
+        [SerializeField, FormerlySerializedAs("projectileSpawns")] private List<ProjectileSpawnData> projectileSpawnsValue = new List<ProjectileSpawnData>();
+
+        public string Id => stableId;
+        public string attackName => attackNameValue;
+        public IReadOnlyList<ProjectileSpawnData> projectileSpawns => projectileSpawnsValue;
+
+        /// <summary>Returns the sequential sum of configured spawn delays.</summary>
+        public float GetTotalAttackDuration()
         {
-            if (spawn.spawnDelay > maxDelay)
-                maxDelay = spawn.spawnDelay;
+            float duration = 0f;
+            foreach (ProjectileSpawnData spawn in projectileSpawnsValue)
+                if (spawn != null) duration += spawn.spawnDelay;
+            return duration;
         }
-        
-        return maxDelay;
-    }
-    
-    public int GetProjectileCount()
-    {
-        return projectileSpawns?.Count ?? 0;
-    }
-    
-    public bool IsValid()
-    {
-        if (projectileSpawns == null || projectileSpawns.Count == 0)
-            return false;
-        
-        foreach (var spawn in projectileSpawns)
+
+        /// <summary>Returns the number of configured projectile entries.</summary>
+        public int GetProjectileCount() => projectileSpawnsValue.Count;
+
+        /// <summary>Returns whether every projectile entry has valid configuration.</summary>
+        public bool IsValid()
         {
-            if (spawn.projectileConfig == null)
-                return false;
+            if (projectileSpawnsValue.Count == 0) return false;
+            foreach (ProjectileSpawnData spawn in projectileSpawnsValue)
+                if (spawn == null || spawn.projectileConfig == null || spawn.damageMultiplier < 0f) return false;
+            return true;
         }
-        
-        return true;
+
+        private void OnValidate()
+        {
+            if (string.IsNullOrWhiteSpace(stableId)) stableId = Guid.NewGuid().ToString("N");
+            stableId = stableId.Trim();
+            attackNameValue = attackNameValue?.Trim() ?? string.Empty;
+            projectileSpawnsValue ??= new List<ProjectileSpawnData>();
+            foreach (ProjectileSpawnData spawn in projectileSpawnsValue) spawn?.Validate();
+        }
     }
-}
-
-
 }

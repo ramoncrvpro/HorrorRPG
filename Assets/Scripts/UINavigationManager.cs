@@ -1,80 +1,52 @@
-namespace HorrorRPG.Presentation
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
 using HorrorRPG.Core;
 using HorrorRPG.Input;
-
-
-using System;
-using System.Collections.Generic;
 using UnityEngine;
 
-public class UINavigationManager : MonoBehaviour
+namespace HorrorRPG.Presentation
 {
-    public static UINavigationManager Instance { get; private set; }
-
-    [SerializeField] private GameInputReader inputReader;
-    private readonly Stack<UIState> navigationStack = new Stack<UIState>();
-
-
-
-    private void Awake() { if (inputReader == null) inputReader = FindFirstObjectByType<GameInputReader>(); }
-    private void OnEnable() { if (inputReader != null) inputReader.CancelPerformed += HandleBackNavigation; }
-    private void OnDisable() { if (inputReader != null) inputReader.CancelPerformed -= HandleBackNavigation; }
-
-    public void PushState(UIState state)
+    /// <summary>Scene-local adapter that forwards cancel input to the navigation service.</summary>
+    public sealed class UINavigationManager : MonoBehaviour, IGameContextReceiver
     {
-        if (state == null)
+        private GameInputReader inputReader;
+        private UINavigationService navigationService;
+        private bool subscribed;
+
+        /// <summary>Injects navigation and input dependencies for the active scene.</summary>
+        public void Initialize(GameContext context)
         {
-            Debug.LogWarning("Tentativa de adicionar UIState nulo à pilha de navegação");
-            return;
+            if (context == null) throw new System.ArgumentNullException(nameof(context));
+            inputReader = context.InputReader;
+            navigationService = context.Navigation;
+            Subscribe();
         }
 
-        navigationStack.Push(state);
-    }
-
-    public void PopState()
-    {
-        if (navigationStack.Count > 0)
+        /// <summary>Releases the cancel callback and scene navigation entries.</summary>
+        public void Deinitialize()
         {
-            navigationStack.Pop();
+            Unsubscribe();
+            navigationService?.ClearSceneEntries();
+            inputReader = null;
+            navigationService = null;
         }
-    }
 
-    public void ClearStack()
-    {
-        navigationStack.Clear();
-    }
+        private void OnEnable() => Subscribe();
+        private void OnDisable() => Unsubscribe();
 
-    private void HandleBackNavigation()
-    {
-        if (navigationStack.Count > 0)
+        private void Subscribe()
         {
-            UIState currentState = navigationStack.Peek();
-            currentState?.onBackPressed?.Invoke();
+            if (!isActiveAndEnabled || inputReader == null || subscribed) return;
+            inputReader.CancelPerformed += HandleBackNavigation;
+            subscribed = true;
         }
+
+        private void Unsubscribe()
+        {
+            if (!subscribed || inputReader == null) return;
+            inputReader.CancelPerformed -= HandleBackNavigation;
+            subscribed = false;
+        }
+
+        private void HandleBackNavigation() => navigationService?.NavigateBack();
+        private void OnDestroy() => Deinitialize();
     }
-
-    public int GetStackCount()
-    {
-        return navigationStack.Count;
-    }
-}
-
-public class UIState
-{
-    public string stateName;
-    public Action onBackPressed;
-
-    public UIState(string name, Action backCallback)
-    {
-        stateName = name;
-        onBackPressed = backCallback;
-    }
-}
-
-
 }

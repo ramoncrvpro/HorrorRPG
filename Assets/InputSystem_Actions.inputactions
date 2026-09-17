@@ -198,6 +198,17 @@
                 },
                 {
                     "name": "",
+                    "id": "a1fbe6a7-11c3-4f1d-8c44-2d92f7a3c5b8",
+                    "path": "<Keyboard>/tab",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Cancel",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "46c6dd98-8413-4f62-9454-ff656a46b906",
                     "path": "<Gamepad>/buttonEast",
                     "interactions": "",

@@ -1,52 +1,54 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Serialization;
+
 namespace HorrorRPG.Battle
 {
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
-
-
-using UnityEngine;
-using System.Collections.Generic;
-
-[CreateAssetMenu(fileName = "New Enemy", menuName = "Battle/Enemy")]
-public class EnemyData : ScriptableObject
-{
-    [Header("Enemy Info")]
-    public string enemyName = "Enemy";
-    
-    [Header("Enemy Stats")]
-    public int maxHealth = 50;
-    public int baseDamage = 10;
-    public EnemyType category = EnemyType.None;
-    
-    [Header("Attack System")]
-    [Tooltip("Lista de ataques disponíveis para este inimigo")]
-    public List<AttackData> availableAttacks = new List<AttackData>();
-    
-    public AttackData GetRandomAttack()
+    [CreateAssetMenu(fileName = "New Enemy", menuName = "Battle/Enemy")]
+    public class EnemyData : ScriptableObject
     {
-        if (availableAttacks == null || availableAttacks.Count == 0)
-            return null;
-        
-        List<AttackData> validAttacks = new List<AttackData>();
-        foreach (var attack in availableAttacks)
+        [SerializeField] private string stableId;
+        [Header("Enemy Info")]
+        [SerializeField, FormerlySerializedAs("enemyName")] private string enemyNameValue = "Enemy";
+        [Header("Enemy Stats")]
+        [SerializeField, FormerlySerializedAs("maxHealth")] private int maxHealthValue = 50;
+        [SerializeField, FormerlySerializedAs("baseDamage")] private int baseDamageValue = 10;
+        [SerializeField, FormerlySerializedAs("category")] private EnemyType categoryValue = EnemyType.None;
+        [Header("Attack System")]
+        [SerializeField, FormerlySerializedAs("availableAttacks")] private List<AttackData> availableAttacksValue = new List<AttackData>();
+
+        public string Id => stableId;
+        public string enemyName => enemyNameValue;
+        public int maxHealth => maxHealthValue;
+        public int baseDamage => baseDamageValue;
+        public EnemyType category => categoryValue;
+        public IReadOnlyList<AttackData> availableAttacks => availableAttacksValue;
+
+        /// <summary>Selects a valid attack without allocating a filtered list.</summary>
+        public AttackData GetRandomAttack()
         {
-            if (attack != null && attack.IsValid())
+            int validCount = 0;
+            foreach (AttackData attack in availableAttacksValue)
+                if (attack != null && attack.IsValid()) validCount++;
+            if (validCount == 0) return null;
+            int selectedValidIndex = UnityEngine.Random.Range(0, validCount);
+            foreach (AttackData attack in availableAttacksValue)
             {
-                validAttacks.Add(attack);
+                if (attack == null || !attack.IsValid()) continue;
+                if (selectedValidIndex-- == 0) return attack;
             }
-        }
-        
-        if (validAttacks.Count == 0)
             return null;
-        
-        int randomIndex = Random.Range(0, validAttacks.Count);
-        return validAttacks[randomIndex];
+        }
+
+        private void OnValidate()
+        {
+            if (string.IsNullOrWhiteSpace(stableId)) stableId = Guid.NewGuid().ToString("N");
+            stableId = stableId.Trim();
+            enemyNameValue = enemyNameValue?.Trim() ?? string.Empty;
+            maxHealthValue = Mathf.Max(1, maxHealthValue);
+            baseDamageValue = Mathf.Max(1, baseDamageValue);
+            availableAttacksValue ??= new List<AttackData>();
+        }
     }
-}
-
-
 }

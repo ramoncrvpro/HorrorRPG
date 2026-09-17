@@ -12,10 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6685e28da0a86c64ba31ec06c9e1f471, type: 3}
   m_Name: FastEnemyProjectile
   m_EditorClassIdentifier: 
-  loopRadius: 0.85
-  loopSpeed: 5
-  minLoopTime: 4
-  maxLoopTime: 6
-  travelSpeed: 6
-  projectilePrefab: {fileID: 2267285648246685531, guid: 65bc7bce635402c479f23ae1ce1fc034, type: 3}
-  projectileColor: {r: 1, g: 1, b: 1, a: 1}
+  stableId: 59fe29e1d7a847cbaf897b1f6537d881
+  loopRadiusValue: 0.85
+  loopSpeedValue: 5
+  minLoopTimeValue: 4
+  maxLoopTimeValue: 6
+  minTravelSpeedValue: 3
+  maxTravelSpeedValue: 8
+  projectileMaterialValue: {fileID: 2100000, guid: 6934c8ed60baa3b47979f33eae300dab, type: 2}

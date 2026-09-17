@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2045995389462646975}
   - component: {fileID: 5513781262160357620}
   - component: {fileID: 447063519097140855}
-  - component: {fileID: 912993185896780126}
+  - component: {fileID: 4453381978148781353}
   m_Layer: 0
   m_Name: SimpleGhost
   m_TagString: Untagged
@@ -48,8 +48,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e32856dfb0bb13499913332fdae1469, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enemyRenderer: {fileID: 6050515950155312200}
+  enemyRenderer: {fileID: 5635101303362683872}
   enemyData: {fileID: 11400000, guid: f771313cce662124aa0648a40d81787b, type: 2}
+  battleManager: {fileID: 0}
+  worldObjectId: {fileID: 4453381978148781353}
   disableAfterTrigger: 1
 --- !u!65 &5513781262160357620
 BoxCollider:
@@ -70,8 +72,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 2, y: 1, z: 2}
-  m_Center: {x: 0, y: 0.61, z: 0}
+  m_Size: {x: 2, y: 1.0000001, z: 7.4577312}
+  m_Center: {x: 0, y: 0.6100008, z: -0.046395425}
 --- !u!114 &447063519097140855
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -84,7 +86,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f1c5917b5975154ebc400e02bffb34e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &912993185896780126
+--- !u!114 &4453381978148781353
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -93,17 +95,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 1655793192712770969}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b875141d8e0322042bf061bdabb3e682, type: 3}
+  m_Script: {fileID: 11500000, guid: 6c712100326cc6e409e0bc32ee94736f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  waypoints: []
-  moveSpeed: 3
-  waypointReachDistance: 0.1
-  pathMode: 0
-  waitTimeAtWaypoint: 1
-  pathColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  waypointColor: {r: 1, g: 0, b: 0, a: 1}
-  waypointGizmoRadius: 0.3
+  value: Floor0:/SimpleGhost
 --- !u!1 &4316084749559019699
 GameObject:
   m_ObjectHideFlags: 0
@@ -113,9 +108,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2151149801283221916}
-  - component: {fileID: 4706938145759422583}
-  - component: {fileID: 6050515950155312200}
-  - component: {fileID: 5687431202488021873}
+  - component: {fileID: 5635101303362683872}
+  - component: {fileID: 6784171131802704018}
   m_Layer: 0
   m_Name: EnemyVisual
   m_TagString: Untagged
@@ -131,37 +125,29 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4316084749559019699}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.7071068, y: -0, z: 0, w: -0.7071068}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 1, z: 0}
-  m_LocalScale: {x: 0.30000013, y: 0.3, z: 0.3}
+  m_LocalScale: {x: 10, y: 10, z: 10}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 218362463255909022}
   m_LocalEulerAnglesHint: {x: 90, y: -180, z: 180}
---- !u!33 &4706938145759422583
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4316084749559019699}
-  m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &6050515950155312200
-MeshRenderer:
+--- !u!212 &5635101303362683872
+SpriteRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4316084749559019699}
   m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
   m_DynamicOccludee: 1
   m_StaticShadowCaster: 0
   m_MotionVectors: 1
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
+  m_RayTracingMode: 0
   m_RayTraceProcedural: 0
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
@@ -169,7 +155,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 1089911d5dc487d4a8c81c15cb1b9bd1, type: 2}
+  - {fileID: 2100000, guid: 9dfc825aed78fcd4ba02077103263b40, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -182,7 +168,7 @@ MeshRenderer:
   m_IgnoreNormalsForChartDetection: 0
   m_ImportantGI: 0
   m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
+  m_SelectedEditorRenderState: 0
   m_MinimumChartSize: 4
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
@@ -190,8 +176,18 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &5687431202488021873
+  m_Sprite: {fileID: -8734259678995080262, guid: d1d954016a34e624cbf9107525363235, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 0.32, y: 0.32}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_MaskInteraction: 0
+  m_SpriteSortPoint: 0
+--- !u!114 &6784171131802704018
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -200,13 +196,8 @@ MonoBehaviour:
   m_GameObject: {fileID: 4316084749559019699}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b0da4dafa576c1a499d4d7f728162093, type: 3}
+  m_Script: {fileID: 11500000, guid: 1b10891ee5dadff48a0974fe352724a9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  columns: 1
-  rows: 2
-  frameRate: 6
-  loop: 1
-  startFrame: 0
-  endFrame: 2
+  animation: {fileID: 11400000, guid: 75dacc1bc2f2b0644b29b08e1e2b4c4d, type: 2}
   playOnAwake: 1

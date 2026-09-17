@@ -1,59 +1,34 @@
-namespace HorrorRPG.Interaction
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
-
-
+using HorrorRPG.Interaction;
 using UnityEngine;
 
-
-public class SceneLoadInteraction : MonoBehaviour, IInteractable
+namespace HorrorRPG.Interaction
 {
-    [Header("Scene Settings")]
-    [SerializeField] private string sceneToLoad;
-    [SerializeField] private string customPrompt = "Press E to enter";
-    
-    [Header("Interaction Settings")]
-    [SerializeField] private bool canInteract = true;
-
-    public void Interact()
+    public class SceneLoadInteraction : MonoBehaviour, IInteractable
     {
-        if (!CanInteract())
-            return;
+        private const string DefaultPrompt = "Press E to enter";
 
-        LoadScene();
-    }
+        [Header("Scene Settings")]
+        [SerializeField] private string sceneToLoad;
+        [SerializeField] private string customPrompt = DefaultPrompt;
+        [Header("Interaction Settings")]
+        [SerializeField] private bool canInteract = true;
 
-    public string GetInteractionPrompt()
-    {
-        return customPrompt;
-    }
-
-    public bool CanInteract()
-    {
-        return canInteract && !string.IsNullOrEmpty(sceneToLoad);
-    }
-
-    private void LoadScene()
-    {
-        if (string.IsNullOrEmpty(sceneToLoad))
+        /// <summary>Loads the configured catalog destination through the scene flow service.</summary>
+        public void Interact(in InteractionContext context)
         {
-            Debug.LogWarning("SceneLoadInteraction: Nome da cena não definido!");
-            return;
+            if (!CanInteract(in context)) return;
+            context.SceneFlow.Load(sceneToLoad.Trim());
         }
 
-        if (GameBootstrap.Instance == null || GameBootstrap.Instance.Context == null)
+        /// <summary>Returns the configured transition prompt.</summary>
+        public string GetInteractionPrompt(in InteractionContext context) => customPrompt;
+
+        /// <summary>Checks local state and whether the destination is enabled in the build.</summary>
+        public bool CanInteract(in InteractionContext context)
         {
-            Debug.LogError($"SceneFlow is unavailable for destination '{sceneToLoad}'.", this);
-            return;
+            return canInteract
+                && !string.IsNullOrWhiteSpace(sceneToLoad)
+                && context.SceneFlow.IsAvailableInBuild(sceneToLoad.Trim());
         }
-        GameBootstrap.Instance.Context.SceneFlow.Load(sceneToLoad);
     }
-}
-
-
 }

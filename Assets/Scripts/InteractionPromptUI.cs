@@ -1,115 +1,65 @@
+using System.Collections;
+using TMPro;
+using UnityEngine;
+
 namespace HorrorRPG.Player
 {
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
-
-
-using UnityEngine;
-using TMPro;
-using System.Collections;
-
-public class InteractionPromptUI : MonoBehaviour
-{
-    public static InteractionPromptUI Instance { get; private set; }
-
-    [Header("UI References")]
-    [SerializeField] private GameObject promptBox;
-    [SerializeField] private TextMeshProUGUI promptText;
-
-    [Header("Prompt Settings")]
-    [SerializeField] private string defaultPromptMessage = "Pressione E para interagir";
-
-    private bool isPromptActive = false;
-    private Coroutine autoHideCoroutine;
-
-    private void Awake()
+    /// <summary>Displays the scene-local interaction prompt.</summary>
+    public class InteractionPromptUI : MonoBehaviour
     {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
+        [Header("UI References")]
+        [SerializeField] private GameObject promptBox;
+        [SerializeField] private TextMeshProUGUI promptText;
+        [Header("Prompt Settings")]
+        [SerializeField] private string defaultPromptMessage = "Pressione E para interagir";
 
-    private void Start()
-    {
-        if (promptBox != null)
-        {
-            promptBox.SetActive(false);
-        }
-    }
+        private Coroutine autoHideCoroutine;
+        public bool IsPromptActive { get; private set; }
+        public bool HasActiveAutoHide => autoHideCoroutine != null;
 
-    public void ShowPrompt(string message = null)
-    {
-        if (autoHideCoroutine != null)
-        {
-            StopCoroutine(autoHideCoroutine);
-            autoHideCoroutine = null;
-        }
+        private void Start() => HidePrompt(true);
 
-        if (promptBox != null && promptText != null)
+        /// <summary>Shows a prompt until explicitly hidden.</summary>
+        public void ShowPrompt(string message = null)
         {
+            StopAutoHide();
+            if (promptBox == null || promptText == null) return;
             promptText.text = string.IsNullOrEmpty(message) ? defaultPromptMessage : message;
             promptBox.SetActive(true);
-            isPromptActive = true;
-        }
-    }
-
-    public void ShowPromptWithDuration(string message, float duration)
-    {
-        if (autoHideCoroutine != null)
-        {
-            StopCoroutine(autoHideCoroutine);
+            IsPromptActive = true;
         }
 
-        ShowPrompt(message);
-        autoHideCoroutine = StartCoroutine(AutoHideAfterDelay(duration));
-    }
-
-    private IEnumerator AutoHideAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        HidePrompt(true);
-        autoHideCoroutine = null;
-    }
-
-    public void HidePrompt(bool force = false)
-    {
-        if (!force && autoHideCoroutine != null)
+        /// <summary>Shows a prompt for a fixed non-negative duration.</summary>
+        public void ShowPromptWithDuration(string message, float duration)
         {
-            return;
+            ShowPrompt(message);
+            autoHideCoroutine = StartCoroutine(AutoHideAfterDelay(Mathf.Max(0f, duration)));
         }
 
-        if (autoHideCoroutine != null)
+        /// <summary>Hides the prompt unless a timed prompt still owns it.</summary>
+        public void HidePrompt(bool force = false)
         {
+            if (!force && autoHideCoroutine != null) return;
+            StopAutoHide();
+            promptBox?.SetActive(false);
+            IsPromptActive = false;
+        }
+
+        /// <summary>Returns whether the prompt is visible.</summary>
+        public bool GetIsPromptActive() => IsPromptActive;
+
+        private IEnumerator AutoHideAfterDelay(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            autoHideCoroutine = null;
+            HidePrompt(true);
+        }
+
+        private void StopAutoHide()
+        {
+            if (autoHideCoroutine == null) return;
             StopCoroutine(autoHideCoroutine);
             autoHideCoroutine = null;
         }
-
-        if (promptBox != null)
-        {
-            promptBox.SetActive(false);
-            isPromptActive = false;
-        }
     }
-
-    public bool IsPromptActive()
-    {
-        return isPromptActive;
-    }
-
-    public bool HasActiveAutoHide()
-    {
-        return autoHideCoroutine != null;
-    }
-}
-
-
 }

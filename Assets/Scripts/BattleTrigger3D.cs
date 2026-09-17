@@ -1,68 +1,85 @@
-namespace HorrorRPG.Battle
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
+using System.Linq;
 using HorrorRPG.Core;
-using HorrorRPG.Input;
-
+using HorrorRPG.Presentation;
 
 using UnityEngine;
 
-public class BattleTrigger3D : MonoBehaviour
+namespace HorrorRPG.Battle
 {
-    [Header("Enemy Renderer")]
-    [SerializeField] private MeshRenderer enemyRenderer;
-
-    [Header("Enemy Data")]
-    [SerializeField] private EnemyData enemyData;
-
-    [Header("Trigger Settings")]
-    [SerializeField] private bool disableAfterTrigger = true;
-
-    private bool hasTriggered = false;
-
-    private void OnTriggerEnter(Collider other)
+    /// <summary>Starts one battle and persists enemy defeat in the runtime world state.</summary>
+    public class BattleTrigger3D : MonoBehaviour, IGameContextReceiver
     {
-        if (hasTriggered)
-            return;
+        [Header("Enemy Renderer")]
+        [SerializeField] private SpriteRenderer enemyRenderer;
+        [Header("Enemy Data")]
+        [SerializeField] private EnemyData enemyData;
+        [Header("Dependencies")]
+        [SerializeField] private BattleManager battleManager;
+        [SerializeField] private WorldObjectId worldObjectId;
+        [Header("Trigger Settings")]
+        [SerializeField] private bool disableAfterTrigger = true;
 
-        if (!IsPlayer(other))
-            return;
+        private GameContext gameContext;
+        private Collider triggerCollider;
+        private bool hasTriggered;
 
-        if (enemyRenderer == null)
+        private void Awake()
         {
-            Debug.LogWarning("BattleTrigger3D: enemyRenderer não está definido no Inspector.");
-            return;
+            triggerCollider = GetComponent<Collider>();
+            if (worldObjectId == null) worldObjectId = GetComponent<WorldObjectId>();
         }
 
-        if (enemyData == null)
+        /// <summary>Injects session state and observes the local battle coordinator.</summary>
+        public void Initialize(GameContext context)
         {
-            Debug.LogWarning("BattleTrigger3D: enemyData não está definido no Inspector.");
-            return;
+            gameContext = context ?? throw new System.ArgumentNullException(nameof(context));
+            if (battleManager == null)
+            {
+                Debug.LogError($"{nameof(BattleTrigger3D)} requires a {nameof(BattleManager)} reference on {name}.", this);
+                return;
+            }
+            battleManager.BattleEnded += HandleBattleEnded;
+            if (worldObjectId != null && gameContext.Session.World.DefeatedEnemies.Contains(worldObjectId.Value)) gameObject.SetActive(false);
         }
 
-        BattleManager.Instance.StartBattle(enemyRenderer, enemyData);
-
-        if (disableAfterTrigger)
+        /// <summary>Releases the battle result callback.</summary>
+        public void Deinitialize()
         {
+            if (battleManager != null) battleManager.BattleEnded -= HandleBattleEnded;
+            gameContext = null;
+        }
+
+        private void OnTriggerEnter(Collider other)
+        {
+            if (hasTriggered || !IsPlayer(other) || battleManager == null) return;
+            if (enemyRenderer == null || enemyData == null)
+            {
+                Debug.LogError($"{nameof(BattleTrigger3D)} has incomplete enemy references on {name}.", this);
+                return;
+            }
+            SpriteRendererAnimator enemyAnimator = enemyRenderer.GetComponent<SpriteRendererAnimator>();
+            if (!battleManager.StartBattle(enemyRenderer, enemyAnimator, enemyData)) return;
             hasTriggered = true;
-            gameObject.SetActive(false);
+            if (triggerCollider != null) triggerCollider.enabled = false;
         }
+
+        private void HandleBattleEnded(BattleEndReason reason)
+        {
+            if (reason == BattleEndReason.Won)
+            {
+                if (worldObjectId != null && gameContext != null) gameContext.Session.World.MarkEnemyDefeated(worldObjectId.Value);
+                if (disableAfterTrigger) gameObject.SetActive(false);
+                return;
+            }
+            hasTriggered = false;
+            if (triggerCollider != null) triggerCollider.enabled = true;
+        }
+
+        private static bool IsPlayer(Collider other)
+        {
+            return other.CompareTag("Player") || other.GetComponent<CharacterController>() != null;
+        }
+
+        private void OnDestroy() => Deinitialize();
     }
-
-    private bool IsPlayer(Collider other)
-    {
-        if (other.CompareTag("Player"))
-            return true;
-
-        if (other.GetComponent<CharacterController>() != null)
-            return true;
-
-        return false;
-    }
-}
-
-
 }

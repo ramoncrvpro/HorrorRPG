@@ -1,120 +1,88 @@
+using HorrorRPG.Inventory;
+using UnityEngine;
+using UnityEngine.Serialization;
+
 namespace HorrorRPG.Battle
 {
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
+    public enum EnemyType { None, Demon, Ghost, Zombie }
+    public enum AttackResult { Miss, Hit, Critical }
 
-
-using UnityEngine;
-
-public enum EnemyType
-{
-    None,
-    Demon,
-    Ghost,
-    Zombie
-}
-
-public enum AttackResult
-{
-    Miss,
-    Hit,
-    Critical
-}
-
-[CreateAssetMenu(fileName = "New Weapon", menuName = "Inventory/Weapon")]
-public class WeaponData : ItemData
-{
-    [Header("Weapon Stats")]
-    public int baseDamage = 10;
-    public EnemyType effectiveAgainst = EnemyType.None;
-    public float effectivenessMultiplier = 2f;
-    
-    [Header("Ammo System")]
-    public ItemData ammoType;
-    
-    [Header("Timing Bar Settings")]
-    [Range(0.5f, 5f)]
-    public float markerSpeed = 2f;
-    
-    [Header("Hit Zones (valores de 0 a 1)")]
-    [Range(0f, 1f)]
-    public float criticalZoneCenter = 0.5f;
-    
-    [Range(0.01f, 0.2f)]
-    public float criticalZoneWidth = 0.05f;
-    
-    [Range(0.1f, 0.5f)]
-    public float hitZoneWidth = 0.4f;
-    
-    [Range(1f, 3f)]
-    public float criticalMultiplier = 1.5f;
-    
-    public bool requiresAmmo => ammoType != null;
-    public bool IsDefaultWeapon => !requiresAmmo;
-    
-    public int GetEffectiveDamage(EnemyType targetType)
+    [CreateAssetMenu(fileName = "New Weapon", menuName = "Inventory/Weapon")]
+    public class WeaponData : ItemData
     {
-        if (targetType == effectiveAgainst)
+        [Header("Weapon Stats")]
+        [SerializeField, FormerlySerializedAs("baseDamage")] private int baseDamageValue = 10;
+        [SerializeField, FormerlySerializedAs("effectiveAgainst")] private EnemyType effectiveAgainstValue = EnemyType.None;
+        [SerializeField, FormerlySerializedAs("effectivenessMultiplier")] private float effectivenessMultiplierValue = 2f;
+        [Header("Ammo System")]
+        [SerializeField, FormerlySerializedAs("ammoType")] private ItemData ammoTypeValue;
+        [Header("Timing Bar Settings")]
+        [SerializeField, FormerlySerializedAs("markerSpeed"), Range(0.5f, 5f)] private float markerSpeedValue = 2f;
+        [Header("Hit Zones (values from 0 to 1)")]
+        [SerializeField, FormerlySerializedAs("criticalZoneCenter"), Range(0f, 1f)] private float criticalZoneCenterValue = 0.5f;
+        [SerializeField, FormerlySerializedAs("criticalZoneWidth"), Range(0.01f, 0.2f)] private float criticalZoneWidthValue = 0.05f;
+        [SerializeField, FormerlySerializedAs("hitZoneWidth"), Range(0.1f, 0.5f)] private float hitZoneWidthValue = 0.4f;
+        [SerializeField, FormerlySerializedAs("criticalMultiplier"), Range(1f, 3f)] private float criticalMultiplierValue = 1.5f;
+
+        public int baseDamage => baseDamageValue;
+        public EnemyType effectiveAgainst => effectiveAgainstValue;
+        public float effectivenessMultiplier => effectivenessMultiplierValue;
+        public ItemData ammoType => ammoTypeValue;
+        public float markerSpeed => markerSpeedValue;
+        public float criticalZoneCenter => criticalZoneCenterValue;
+        public float criticalZoneWidth => criticalZoneWidthValue;
+        public float hitZoneWidth => hitZoneWidthValue;
+        public float criticalMultiplier => criticalMultiplierValue;
+        public bool requiresAmmo => ammoTypeValue != null;
+        public bool IsDefaultWeapon => !requiresAmmo;
+
+        /// <summary>Returns damage after applying target effectiveness.</summary>
+        public int GetEffectiveDamage(EnemyType targetType)
         {
-            return Mathf.RoundToInt(baseDamage * effectivenessMultiplier);
+            return targetType == effectiveAgainstValue
+                ? Mathf.RoundToInt(baseDamageValue * effectivenessMultiplierValue)
+                : baseDamageValue;
         }
-        return baseDamage;
-    }
-    
-    public bool CanUse(InventoryManager inventory)
-    {
-        if (!requiresAmmo) 
-            return true;
-        
-        return inventory.HasItem(ammoType, 1);
-    }
-    
-    public AttackResult EvaluateTimingPosition(float normalizedPosition)
-    {
-        float criticalMin = criticalZoneCenter - (criticalZoneWidth / 2f);
-        float criticalMax = criticalZoneCenter + (criticalZoneWidth / 2f);
-        
-        if (normalizedPosition >= criticalMin && normalizedPosition <= criticalMax)
+
+        /// <summary>Evaluates a normalized marker position against timing zones.</summary>
+        public AttackResult EvaluateTimingPosition(float normalizedPosition)
         {
-            return AttackResult.Critical;
+            float position = Mathf.Clamp01(normalizedPosition);
+            float criticalMinimum = criticalZoneCenterValue - criticalZoneWidthValue * 0.5f;
+            float criticalMaximum = criticalZoneCenterValue + criticalZoneWidthValue * 0.5f;
+            if (position >= criticalMinimum && position <= criticalMaximum) return AttackResult.Critical;
+            float hitLeftMinimum = Mathf.Max(0f, criticalMinimum - hitZoneWidthValue);
+            float hitRightMaximum = Mathf.Min(1f, criticalMaximum + hitZoneWidthValue);
+            if ((position >= hitLeftMinimum && position < criticalMinimum) || (position > criticalMaximum && position <= hitRightMaximum))
+                return AttackResult.Hit;
+            return AttackResult.Miss;
         }
-        
-        float hitZoneLeftMin = Mathf.Max(0f, criticalMin - hitZoneWidth);
-        float hitZoneLeftMax = criticalMin;
-        
-        float hitZoneRightMin = criticalMax;
-        float hitZoneRightMax = Mathf.Min(1f, criticalMax + hitZoneWidth);
-        
-        if ((normalizedPosition >= hitZoneLeftMin && normalizedPosition < hitZoneLeftMax) ||
-            (normalizedPosition > hitZoneRightMin && normalizedPosition <= hitZoneRightMax))
+
+        /// <summary>Returns final damage for timing quality and target type.</summary>
+        public int GetDamageByResult(AttackResult result, EnemyType targetType)
         {
-            return AttackResult.Hit;
+            int effectiveDamage = GetEffectiveDamage(targetType);
+            return result switch
+            {
+                AttackResult.Critical => Mathf.RoundToInt(effectiveDamage * criticalMultiplierValue),
+                AttackResult.Hit => effectiveDamage,
+                AttackResult.Miss => 0,
+                _ => effectiveDamage
+            };
         }
-        
-        return AttackResult.Miss;
-    }
-    
-    public int GetDamageByResult(AttackResult result, EnemyType targetType)
-    {
-        int baseDmg = GetEffectiveDamage(targetType);
-        
-        switch (result)
+
+        protected override void OnValidate()
         {
-            case AttackResult.Critical:
-                return Mathf.RoundToInt(baseDmg * criticalMultiplier);
-            case AttackResult.Hit:
-                return baseDmg;
-            case AttackResult.Miss:
-                return 0;
-            default:
-                return baseDmg;
+            base.OnValidate();
+            baseDamageValue = Mathf.Max(1, baseDamageValue);
+            effectivenessMultiplierValue = Mathf.Max(0f, effectivenessMultiplierValue);
+            markerSpeedValue = Mathf.Clamp(markerSpeedValue, 0.5f, 5f);
+            criticalZoneCenterValue = Mathf.Clamp01(criticalZoneCenterValue);
+            float maximumCriticalWidth = Mathf.Max(0.01f, 2f * Mathf.Min(criticalZoneCenterValue, 1f - criticalZoneCenterValue));
+            criticalZoneWidthValue = Mathf.Clamp(criticalZoneWidthValue, 0.01f, Mathf.Min(0.2f, maximumCriticalWidth));
+            hitZoneWidthValue = Mathf.Clamp(hitZoneWidthValue, 0.1f, 0.5f);
+            criticalMultiplierValue = Mathf.Clamp(criticalMultiplierValue, 1f, 3f);
+            if (ammoTypeValue == this) ammoTypeValue = null;
         }
     }
-}
-
-
 }

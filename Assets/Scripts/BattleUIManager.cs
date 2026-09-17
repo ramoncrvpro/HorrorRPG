@@ -1,921 +1,388 @@
-namespace HorrorRPG.Battle
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
+using System;
+using System.Collections.Generic;
 using HorrorRPG.Core;
 using HorrorRPG.Input;
-using HorrorRPG.Player;
-
-
-
-using System.Collections.Generic;
+using HorrorRPG.Inventory;
+using HorrorRPG.Presentation;
 using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
 
-public class BattleUIManager : MonoBehaviour
+namespace HorrorRPG.Battle
 {
-    public static BattleUIManager Instance { get; private set; }
-
-    [Header("UI References")]
-    [SerializeField] private GameObject battleMainMenuBackground;
-    [SerializeField] private GameObject attackMenuBackground;
-    [SerializeField] private GameObject itensMenuBackground;
-    [SerializeField] private GameObject emptyMessage;
-    [SerializeField] private GameObject emptyMessageItems;
-    
-    [Header("Main Menu Buttons")]
-    [SerializeField] private SelectableButton attackButton;
-    [SerializeField] private SelectableButton itemsButton;
-    [SerializeField] private SelectableButton runButton;
-
-    [Header("Attack Menu")]
-    [SerializeField] private Transform weaponTabsParent;
-    [SerializeField] private Transform weaponSlotsParent;
-    [SerializeField] private GameObject weaponTabPrefab;
-    [SerializeField] private GameObject weaponSlotPrefab;
-
-    [Header("Items Menu")]
-    [SerializeField] private Transform itemSlotsParent;
-
-    [Header("Health Bars")]
-    [SerializeField] private HealthBar playerHealthBar;
-    [SerializeField] private HealthBar enemyHealthBar;
-
-
-    [Header("Settings")]
-    [SerializeField] private int maxWeaponSlots = 9;
-
-    private List<SelectableButton> mainMenuButtons = new List<SelectableButton>();
-    private int currentMainMenuIndex = 0;
-    private bool isMainMenuOpen = false;
-
-    private List<WeaponTab> weaponTabs = new List<WeaponTab>();
-    private int currentTabIndex = 0;
-    private WeaponCategory currentCategory = WeaponCategory.Used;
-
-    private List<WeaponSlotUI> weaponSlotUIList = new List<WeaponSlotUI>();
-    private WeaponSlotUI currentlySelectedWeaponSlot;
-    private int currentSelectedWeaponIndex = -1;
-
-    private bool isAttackMenuOpen = false;
-
-    private UIState attackMenuState;
-
-    private List<ItemSlotUI> itemSlotUIList = new List<ItemSlotUI>();
-    private ItemSlotUI currentlySelectedItemSlot;
-    private int currentSelectedItemIndex = -1;
-    private bool isItemsMenuOpen = false;
-    private UIState itemsMenuState;
-    private GameInputReader inputReader;
-
-    private void OnEnable()
+    /// <summary>Presents battle state and forwards player menu intent without applying rules.</summary>
+    public class BattleUIManager : MonoBehaviour, IGameContextReceiver
     {
-        inputReader = FindFirstObjectByType<GameInputReader>();
-        if (inputReader == null)
+        private static readonly WeaponCategory[] WeaponCategories = { WeaponCategory.Used, WeaponCategory.Basic, WeaponCategory.Limited };
+        private static readonly string[] WeaponCategoryLabels = { "USED", "BASIC", "LIMITED" };
+
+        [Header("UI References")]
+        [SerializeField] private GameObject battleMainMenuBackground;
+        [SerializeField] private GameObject attackMenuBackground;
+        [SerializeField] private GameObject itensMenuBackground;
+        [SerializeField] private GameObject emptyMessage;
+        [SerializeField] private GameObject emptyMessageItems;
+        [Header("Main Menu Buttons")]
+        [SerializeField] private SelectableButton attackButton;
+        [SerializeField] private SelectableButton itemsButton;
+        [SerializeField] private SelectableButton runButton;
+        [Header("Attack Menu")]
+        [SerializeField] private WeaponTab[] weaponTabs;
+        [SerializeField] private WeaponSlotUI[] weaponSlots;
+        [Header("Items Menu")]
+        [SerializeField] private ItemSlotUI[] itemSlots;
+        [Header("Health Bars")]
+        [SerializeField] private HealthBar playerHealthBar;
+        [SerializeField] private HealthBar enemyHealthBar;
+
+        private readonly List<SelectableButton> mainMenuButtons = new List<SelectableButton>();
+        private readonly List<WeaponData> visibleWeapons = new List<WeaponData>();
+        private readonly List<InventoryEntry> visibleItems = new List<InventoryEntry>();
+        private GameContext gameContext;
+        private BattleService battleService;
+        private InventoryService inventoryService;
+        private GameInputReader inputReader;
+        private UINavigationHandle submenuHandle;
+        private int mainMenuIndex;
+        private int weaponTabIndex;
+        private int weaponIndex = -1;
+        private int itemIndex = -1;
+        private bool mainMenuOpen;
+        private bool attackMenuOpen;
+        private bool itemsMenuOpen;
+        private bool initialized;
+
+        public event Action<WeaponData> WeaponSelected;
+        public event Action<ConsumableData> ConsumableSelected;
+        public event Action RunRequested;
+
+        private void Awake()
         {
-            return;
+            ConfigureMainMenu();
+            ConfigureTabs();
+            CloseBattleUI();
         }
 
-        inputReader.BattleNavigatePerformed += HandleBattleNavigation;
-        inputReader.BattleSubmitPerformed += HandleBattleSubmit;
-        inputReader.BattleCancelPerformed += HandleBattleCancel;
-    }
-
-    private void OnDisable()
-    {
-        if (inputReader == null)
+        /// <summary>Injects battle, inventory, navigation and input services.</summary>
+        public void Initialize(GameContext context)
         {
-            return;
+            if (initialized) return;
+            gameContext = context ?? throw new ArgumentNullException(nameof(context));
+            battleService = context.Battle;
+            inventoryService = context.Inventory;
+            inputReader = context.InputReader;
+            battleService.PhaseChanged += HandlePhaseChanged;
+            battleService.HealthChanged += HandleHealthChanged;
+            battleService.CommandRejected += HandleCommandRejected;
+            inventoryService.Changed += HandleInventoryChanged;
+            inputReader.BattleNavigatePerformed += HandleBattleNavigation;
+            inputReader.BattleSubmitPerformed += HandleBattleSubmit;
+            inputReader.BattleCancelPerformed += HandleBattleCancel;
+            initialized = true;
         }
 
-        inputReader.BattleNavigatePerformed -= HandleBattleNavigation;
-        inputReader.BattleSubmitPerformed -= HandleBattleSubmit;
-        inputReader.BattleCancelPerformed -= HandleBattleCancel;
-    }
-
-    private void Awake()
-    {
-        if (Instance == null)
+        /// <summary>Releases battle presentation callbacks and closes all menus.</summary>
+        public void Deinitialize()
         {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        if (battleMainMenuBackground != null)
-        {
-            battleMainMenuBackground.SetActive(false);
+            if (!initialized) return;
+            battleService.PhaseChanged -= HandlePhaseChanged;
+            battleService.HealthChanged -= HandleHealthChanged;
+            battleService.CommandRejected -= HandleCommandRejected;
+            inventoryService.Changed -= HandleInventoryChanged;
+            inputReader.BattleNavigatePerformed -= HandleBattleNavigation;
+            inputReader.BattleSubmitPerformed -= HandleBattleSubmit;
+            inputReader.BattleCancelPerformed -= HandleBattleCancel;
+            CloseBattleUI();
+            gameContext = null;
+            battleService = null;
+            inventoryService = null;
+            inputReader = null;
+            initialized = false;
         }
 
-        if (attackMenuBackground != null)
+        /// <summary>Initializes health presentation for the active battle.</summary>
+        public void InitializeBattle()
         {
-            attackMenuBackground.SetActive(false);
+            if (battleService?.State.Enemy == null) return;
+            playerHealthBar?.gameObject.SetActive(true);
+            enemyHealthBar?.gameObject.SetActive(true);
+            enemyHealthBar?.Initialize(battleService.State.Enemy.enemyName, battleService.State.CurrentEnemyHealth, battleService.State.Enemy.maxHealth);
+            playerHealthBar?.InitializeAsPlayerHealthBar(gameContext.Session.Player.CurrentHealth, gameContext.Session.Player.MaxHealth);
         }
 
-        if (itensMenuBackground != null)
+        /// <summary>Refreshes both health bars from authoritative runtime state.</summary>
+        public void UpdateHealthBars()
         {
-            itensMenuBackground.SetActive(false);
+            if (battleService?.State.Enemy != null)
+                enemyHealthBar?.SetHealth(battleService.State.CurrentEnemyHealth, battleService.State.Enemy.maxHealth);
+            if (gameContext != null)
+                playerHealthBar?.SetHealth(gameContext.Session.Player.CurrentHealth, gameContext.Session.Player.MaxHealth);
         }
 
-        InitializeMainMenuButtons();
-        InitializeWeaponTabs();
-        FindOrCreateWeaponSlots();
-        FindOrCreateItemSlots();
-        DisableHealthBars();
-    }
-
-    private void InitializeMainMenuButtons()
-    {
-        if (attackButton != null)
+        /// <summary>Closes all battle menus while preserving health bars.</summary>
+        public void HideAllMenus()
         {
-            attackButton.SetText("Attack");
-            mainMenuButtons.Add(attackButton);
+            CloseSubmenu(false);
+            if (battleMainMenuBackground != null) battleMainMenuBackground.SetActive(false);
+            mainMenuOpen = false;
         }
 
-        if (itemsButton != null)
+        /// <summary>Opens the main battle choices.</summary>
+        public void OpenMainMenu()
         {
-            itemsButton.SetText("Items");
-            mainMenuButtons.Add(itemsButton);
+            CloseSubmenu(false);
+            mainMenuOpen = true;
+            if (battleMainMenuBackground != null) battleMainMenuBackground.SetActive(true);
+            SelectMainMenu(0);
         }
 
-        if (runButton != null)
+        /// <summary>Closes battle menus and health presentation.</summary>
+        public void CloseBattleUI()
         {
-            runButton.SetText("Run");
-            mainMenuButtons.Add(runButton);
-        }
-    }
-
-    private void InitializeWeaponTabs()
-    {
-        if (weaponTabsParent == null || weaponTabPrefab == null)
-        {
-            return;
+            HideAllMenus();
+            playerHealthBar?.gameObject.SetActive(false);
+            enemyHealthBar?.gameObject.SetActive(false);
         }
 
-        WeaponCategory[] categories = { WeaponCategory.Used, WeaponCategory.Basic, WeaponCategory.Limited };
-        string[] tabNames = { "USED", "BASIC", "LIMITED" };
-
-        for (int i = 0; i < categories.Length; i++)
+        private void ConfigureMainMenu()
         {
-            GameObject tabObject = Instantiate(weaponTabPrefab, weaponTabsParent);
-            WeaponTab tab = tabObject.GetComponent<WeaponTab>();
-            
-            if (tab == null)
+            mainMenuButtons.Clear();
+            if (attackButton != null) { attackButton.SetText("Attack"); mainMenuButtons.Add(attackButton); }
+            if (itemsButton != null) { itemsButton.SetText("Items"); mainMenuButtons.Add(itemsButton); }
+            if (runButton != null) { runButton.SetText("Run"); mainMenuButtons.Add(runButton); }
+        }
+
+        private void ConfigureTabs()
+        {
+            if (weaponTabs == null) return;
+            for (int index = 0; index < weaponTabs.Length && index < WeaponCategories.Length; index++)
+                weaponTabs[index]?.Initialize(WeaponCategories[index], WeaponCategoryLabels[index]);
+        }
+
+        private void HandlePhaseChanged(BattlePhase phase)
+        {
+            switch (phase)
             {
-                tab = tabObject.AddComponent<WeaponTab>();
+                case BattlePhase.Entering:
+                    InitializeBattle();
+                    HideAllMenus();
+                    break;
+                case BattlePhase.PlayerChoice:
+                    UpdateHealthBars();
+                    OpenMainMenu();
+                    break;
+                case BattlePhase.Idle:
+                case BattlePhase.Won:
+                case BattlePhase.Lost:
+                case BattlePhase.Exiting:
+                    CloseBattleUI();
+                    break;
+                default:
+                    HideAllMenus();
+                    break;
             }
-
-            tab.Initialize(categories[i], tabNames[i]);
-            weaponTabs.Add(tab);
         }
 
-        currentTabIndex = 0;
-        currentCategory = WeaponCategory.Used;
-        UpdateWeaponTabsVisuals();
-    }
-
-    private void FindOrCreateWeaponSlots()
-    {
-        if (weaponSlotsParent != null)
+        private void HandleHealthChanged(BattleHealthChangedEvent change)
         {
-            WeaponSlotUI[] existingSlots = weaponSlotsParent.GetComponentsInChildren<WeaponSlotUI>(true);
-            
-            foreach (WeaponSlotUI slot in existingSlots)
-            {
-                weaponSlotUIList.Add(slot);
-                slot.gameObject.SetActive(false);
-            }
+            if (change.Target == BattleHealthTarget.Player) playerHealthBar?.SetHealth(change.Current, change.Maximum);
+            else enemyHealthBar?.SetHealth(change.Current, change.Maximum);
+        }
 
-            int slotsToCreate = maxWeaponSlots - weaponSlotUIList.Count;
-            for (int i = 0; i < slotsToCreate; i++)
+        private void HandleInventoryChanged(InventoryChangedEvent change)
+        {
+            if (attackMenuOpen) RefreshWeapons();
+            if (itemsMenuOpen) RefreshItems();
+        }
+
+        private void HandleCommandRejected(BattleCommandResult result)
+        {
+            if (!result.Accepted) Debug.LogWarning($"Battle command rejected: {result.Reason}", this);
+        }
+
+        private void HandleBattleNavigation(Vector2 navigation)
+        {
+            if (navigation.sqrMagnitude < 0.25f) return;
+            if (mainMenuOpen && !attackMenuOpen && !itemsMenuOpen) SelectMainMenuWrapped(navigation.y < 0f ? 1 : -1);
+            else if (attackMenuOpen)
             {
-                if (weaponSlotPrefab != null)
+                if (Mathf.Abs(navigation.x) > Mathf.Abs(navigation.y)) ChangeWeaponTab(navigation.x > 0f ? 1 : -1);
+                else SelectWeaponWrapped(navigation.y < 0f ? 1 : -1);
+            }
+            else if (itemsMenuOpen) SelectItemWrapped(navigation.y < 0f ? 1 : -1);
+        }
+
+        private void HandleBattleSubmit()
+        {
+            if (mainMenuOpen && !attackMenuOpen && !itemsMenuOpen) ExecuteMainMenu();
+            else if (attackMenuOpen && weaponIndex >= 0 && weaponIndex < visibleWeapons.Count)
+            {
+                WeaponData weapon = visibleWeapons[weaponIndex];
+                CloseSubmenu(true);
+                WeaponSelected?.Invoke(weapon);
+            }
+            else if (itemsMenuOpen && itemIndex >= 0 && itemIndex < visibleItems.Count && visibleItems[itemIndex].Item is ConsumableData consumable)
+            {
+                CloseSubmenu(true);
+                ConsumableSelected?.Invoke(consumable);
+            }
+        }
+
+        private void HandleBattleCancel()
+        {
+            if (attackMenuOpen || itemsMenuOpen)
+            {
+                CloseSubmenu(true);
+                OpenMainMenu();
+            }
+        }
+
+        private void ExecuteMainMenu()
+        {
+            if (mainMenuIndex == 0) OpenAttackMenu();
+            else if (mainMenuIndex == 1) OpenItemsMenu();
+            else if (mainMenuIndex == 2) RunRequested?.Invoke();
+        }
+
+        private void OpenAttackMenu()
+        {
+            mainMenuOpen = false;
+            battleMainMenuBackground?.SetActive(false);
+            attackMenuOpen = true;
+            attackMenuBackground?.SetActive(true);
+            weaponTabIndex = 0;
+            submenuHandle = gameContext.Navigation.Push(UIScreenId.Battle, HandleBattleCancel);
+            RefreshWeapons();
+        }
+
+        private void OpenItemsMenu()
+        {
+            mainMenuOpen = false;
+            battleMainMenuBackground?.SetActive(false);
+            itemsMenuOpen = true;
+            itensMenuBackground?.SetActive(true);
+            submenuHandle = gameContext.Navigation.Push(UIScreenId.Battle, HandleBattleCancel);
+            RefreshItems();
+        }
+
+        private void CloseSubmenu(bool popNavigation)
+        {
+            attackMenuOpen = false;
+            itemsMenuOpen = false;
+            attackMenuBackground?.SetActive(false);
+            itensMenuBackground?.SetActive(false);
+            SelectWeapon(-1);
+            SelectItem(-1);
+            if (popNavigation && gameContext != null) gameContext.Navigation.Pop(submenuHandle);
+            submenuHandle = default;
+        }
+
+        private void RefreshWeapons()
+        {
+            visibleWeapons.Clear();
+            var allWeapons = new List<WeaponData>();
+            foreach (InventoryEntry entry in inventoryService.GetItems())
+                if (entry.Item is WeaponData weapon) allWeapons.Add(weapon);
+
+            WeaponCategory category = WeaponCategories[Mathf.Clamp(weaponTabIndex, 0, WeaponCategories.Length - 1)];
+            if (category == WeaponCategory.Used)
+            {
+                foreach (string id in gameContext.Session.RecentWeapons.WeaponIds)
                 {
-                    GameObject newSlot = Instantiate(weaponSlotPrefab, weaponSlotsParent);
-                    WeaponSlotUI slotUI = newSlot.GetComponent<WeaponSlotUI>();
-                    if (slotUI != null)
-                    {
-                        weaponSlotUIList.Add(slotUI);
-                        slotUI.gameObject.SetActive(false);
-                    }
+                    WeaponData weapon = allWeapons.Find(candidate => GetStableItemId(candidate) == id);
+                    if (weapon != null) visibleWeapons.Add(weapon);
                 }
-            }
-        }
-    }
-
-    private void HandleBattleNavigation(Vector2 navigation)
-    {
-        if (navigation.sqrMagnitude < 0.25f)
-        {
-            return;
-        }
-
-        if (isMainMenuOpen && !isAttackMenuOpen && !isItemsMenuOpen)
-        {
-            HandleMainMenuNavigation(navigation.y < 0f);
-        }
-        else if (isAttackMenuOpen)
-        {
-            if (Mathf.Abs(navigation.x) > Mathf.Abs(navigation.y))
-            {
-                HandleWeaponTabNavigation(navigation.x > 0f);
             }
             else
             {
-                HandleWeaponListNavigation(navigation.y < 0f);
-            }
-        }
-        else if (isItemsMenuOpen)
-        {
-            HandleItemsListNavigation(navigation.y < 0f);
-        }
-    }
-
-    private void HandleBattleSubmit()
-    {
-        if (isMainMenuOpen && !isAttackMenuOpen && !isItemsMenuOpen)
-        {
-            ExecuteMainMenuAction();
-        }
-        else if (isAttackMenuOpen)
-        {
-            OnWeaponSelected();
-        }
-        else if (isItemsMenuOpen)
-        {
-            OnItemSelected();
-        }
-    }
-
-    private void HandleBattleCancel()
-    {
-        if (isAttackMenuOpen)
-        {
-            OnAttackMenuBack();
-        }
-        else if (isItemsMenuOpen)
-        {
-            OnItemsMenuBack();
-        }
-    }
-
-    public void InitializeBattle()
-    {
-        EnableHealthBars();
-        UpdateHealthBars();
-    }
-
-    public void UpdateHealthBars()
-    {
-        if (BattleManager.Instance != null && BattleManager.Instance.CurrentEnemyData != null)
-        {
-            EnemyData enemyData = BattleManager.Instance.CurrentEnemyData;
-            int enemyCurrentHealth = BattleManager.Instance.CurrentEnemyHealth;
-
-            if (enemyHealthBar != null)
-            {
-                enemyHealthBar.SetName(enemyData.enemyName);
-                enemyHealthBar.SetHealth(enemyCurrentHealth, enemyData.maxHealth);
-            }
-        }
-
-        if (PlayerStats.Instance != null)
-        {
-            if (playerHealthBar != null)
-            {
-                playerHealthBar.SetName("Player");
-                playerHealthBar.SetHealth(PlayerStats.Instance.CurrentHealth, PlayerStats.Instance.MaxHealth);
-            }
-        }
-    }
-
-    private void EnableHealthBars()
-    {
-        if (playerHealthBar != null)
-        {
-            playerHealthBar.gameObject.SetActive(true);
-        }
-
-        if (enemyHealthBar != null)
-        {
-            enemyHealthBar.gameObject.SetActive(true);
-        }
-    }
-
-    private void DisableHealthBars()
-    {
-        if (playerHealthBar != null)
-        {
-            playerHealthBar.gameObject.SetActive(false);
-        }
-
-        if (enemyHealthBar != null)
-        {
-            enemyHealthBar.gameObject.SetActive(false);
-        }
-    }
-
-    public void HideAllMenus()
-    {
-        if (battleMainMenuBackground != null)
-        {
-            battleMainMenuBackground.SetActive(false);
-        }
-
-        if (attackMenuBackground != null)
-        {
-            attackMenuBackground.SetActive(false);
-        }
-
-        isMainMenuOpen = false;
-        isAttackMenuOpen = false;
-    }
-
-    public void OpenMainMenu()
-    {
-        if (battleMainMenuBackground != null)
-        {
-            battleMainMenuBackground.SetActive(true);
-            isMainMenuOpen = true;
-            SelectMainMenuButton(0);
-        }
-    }
-
-    public void CloseMainMenu()
-    {
-        if (battleMainMenuBackground != null)
-        {
-            battleMainMenuBackground.SetActive(false);
-            isMainMenuOpen = false;
-            
-            if (currentMainMenuIndex >= 0 && currentMainMenuIndex < mainMenuButtons.Count)
-            {
-                mainMenuButtons[currentMainMenuIndex].SetSelected(false);
-            }
-        }
-    }
-
-    public void CloseBattleUI()
-    {
-        DisableHealthBars();
-        CloseMainMenu();
-    }
-
-    private void HandleMainMenuNavigation(bool moveDown)
-    {
-        if (moveDown)
-        {
-            int nextIndex = currentMainMenuIndex + 1;
-            if (nextIndex >= mainMenuButtons.Count)
-            {
-                nextIndex = 0;
-            }
-            SelectMainMenuButton(nextIndex);
-        }
-        else
-        {
-            int previousIndex = currentMainMenuIndex - 1;
-            if (previousIndex < 0)
-            {
-                previousIndex = mainMenuButtons.Count - 1;
-            }
-            SelectMainMenuButton(previousIndex);
-        }
-    }
-
-    private void SelectMainMenuButton(int index)
-    {
-        if (index < 0 || index >= mainMenuButtons.Count)
-            return;
-
-        if (currentMainMenuIndex >= 0 && currentMainMenuIndex < mainMenuButtons.Count)
-        {
-            mainMenuButtons[currentMainMenuIndex].SetSelected(false);
-        }
-
-        currentMainMenuIndex = index;
-        mainMenuButtons[currentMainMenuIndex].SetSelected(true);
-    }
-
-    private void ExecuteMainMenuAction()
-    {
-        if (currentMainMenuIndex == 0)
-        {
-            OnAttackButtonClicked();
-        }
-        else if (currentMainMenuIndex == 1)
-        {
-            OnItemsButtonClicked();
-        }
-        else if (currentMainMenuIndex == 2)
-        {
-            OnRunButtonClicked();
-        }
-    }
-
-    private void OnAttackButtonClicked()
-    {
-        CloseMainMenu();
-        OpenAttackMenu();
-    }
-
-    private void OnItemsButtonClicked()
-    {
-        CloseMainMenu();
-        OpenItemsMenu();
-    }
-
-    private void OnRunButtonClicked()
-    {
-        if (BattleManager.Instance != null)
-        {
-            BattleManager.Instance.EndBattle();
-        }
-        CloseMainMenu();
-    }
-
-    private void OpenAttackMenu()
-    {
-        if (attackMenuBackground != null)
-        {
-            attackMenuBackground.SetActive(true);
-            isAttackMenuOpen = true;
-            currentTabIndex = 0;
-            currentCategory = WeaponCategory.Used;
-            UpdateWeaponTabsVisuals();
-            RefreshWeaponList();
-
-            attackMenuState = new UIState("AttackMenu", OnAttackMenuBack);
-            if (UINavigationManager.Instance != null)
-            {
-                UINavigationManager.Instance.PushState(attackMenuState);
-            }
-        }
-    }
-
-    private void OnAttackMenuBack()
-    {
-        CloseAttackMenu();
-        OpenMainMenu();
-    }
-
-    private void CloseAttackMenu()
-    {
-        if (attackMenuBackground != null)
-        {
-            attackMenuBackground.SetActive(false);
-            isAttackMenuOpen = false;
-            
-            if (currentlySelectedWeaponSlot != null)
-            {
-                currentlySelectedWeaponSlot.SetSelected(false);
-                currentlySelectedWeaponSlot = null;
-            }
-        }
-
-        if (UINavigationManager.Instance != null)
-        {
-            UINavigationManager.Instance.PopState();
-        }
-    }
-
-    private void HandleWeaponTabNavigation(bool moveRight)
-    {
-        if (moveRight)
-        {
-            currentTabIndex++;
-            if (currentTabIndex >= weaponTabs.Count)
-            {
-                currentTabIndex = 0;
-            }
-            
-            currentCategory = weaponTabs[currentTabIndex].GetCategory();
-            UpdateWeaponTabsVisuals();
-            RefreshWeaponList();
-        }
-        else
-        {
-            currentTabIndex--;
-            if (currentTabIndex < 0)
-            {
-                currentTabIndex = weaponTabs.Count - 1;
-            }
-            
-            currentCategory = weaponTabs[currentTabIndex].GetCategory();
-            UpdateWeaponTabsVisuals();
-            RefreshWeaponList();
-        }
-    }
-
-    private void UpdateWeaponTabsVisuals()
-    {
-        for (int i = 0; i < weaponTabs.Count; i++)
-        {
-            weaponTabs[i].SetSelected(i == currentTabIndex);
-        }
-    }
-
-    private void RefreshWeaponList()
-    {
-        List<WeaponData> filteredWeapons = GetFilteredWeapons();
-
-        for (int i = 0; i < weaponSlotUIList.Count; i++)
-        {
-            if (i < filteredWeapons.Count)
-            {
-                int ammoCount = -1;
-                
-                if (currentCategory == WeaponCategory.Limited && filteredWeapons[i].requiresAmmo)
-                {
-                    if (InventoryManager.Instance != null && filteredWeapons[i].ammoType != null)
-                    {
-                        ammoCount = GetAmmoCount(filteredWeapons[i].ammoType);
-                    }
-                }
-                
-                weaponSlotUIList[i].Setup(filteredWeapons[i], this, ammoCount);
-            }
-            else
-            {
-                weaponSlotUIList[i].Setup(null, this, -1);
-            }
-        }
-
-        if (currentlySelectedWeaponSlot != null)
-        {
-            currentlySelectedWeaponSlot.SetSelected(false);
-            currentlySelectedWeaponSlot = null;
-        }
-
-        if (filteredWeapons.Count == 0)
-        {
-            if (emptyMessage != null)
-            {
-                emptyMessage.SetActive(true);
-            }
-        }
-        else
-        {
-            if (emptyMessage != null)
-            {
-                emptyMessage.SetActive(false);
-            }
-
-            SelectWeaponSlotByIndex(0);
-        }
-    }
-
-    private List<WeaponData> GetFilteredWeapons()
-    {
-        List<WeaponData> filtered = new List<WeaponData>();
-
-        if (InventoryManager.Instance == null)
-            return filtered;
-
-        List<WeaponData> allWeapons = GetAllWeaponsFromInventory();
-
-        switch (currentCategory)
-        {
-            case WeaponCategory.Used:
-                if (RecentWeaponsManager.Instance != null)
-                {
-                    filtered = RecentWeaponsManager.Instance.GetRecentWeapons();
-                    filtered.RemoveAll(w => !allWeapons.Contains(w));
-                }
-                break;
-
-            case WeaponCategory.Basic:
                 foreach (WeaponData weapon in allWeapons)
                 {
-                    if (!weapon.requiresAmmo)
-                    {
-                        filtered.Add(weapon);
-                    }
+                    if ((category == WeaponCategory.Basic && !weapon.requiresAmmo) || (category == WeaponCategory.Limited && weapon.requiresAmmo))
+                        visibleWeapons.Add(weapon);
                 }
-                break;
+            }
 
-            case WeaponCategory.Limited:
-                foreach (WeaponData weapon in allWeapons)
+            int slotCount = weaponSlots?.Length ?? 0;
+            for (int index = 0; index < slotCount; index++)
+            {
+                if (index < visibleWeapons.Count)
                 {
-                    if (weapon.requiresAmmo)
-                    {
-                        filtered.Add(weapon);
-                    }
+                    WeaponData weapon = visibleWeapons[index];
+                    int ammo = weapon.requiresAmmo && weapon.ammoType != null ? inventoryService.GetQuantity(weapon.ammoType) : -1;
+                    weaponSlots[index]?.Setup(weapon, ammo);
                 }
-                break;
+                else weaponSlots[index]?.Setup(null);
+            }
+            emptyMessage?.SetActive(visibleWeapons.Count == 0);
+            UpdateWeaponTabs();
+            SelectWeapon(visibleWeapons.Count > 0 ? 0 : -1);
         }
 
-        return filtered;
+        private void RefreshItems()
+        {
+            visibleItems.Clear();
+            foreach (InventoryEntry entry in inventoryService.GetItems(ItemCategory.Consumable))
+                if (entry.Item is ConsumableData) visibleItems.Add(entry);
+            int slotCount = itemSlots?.Length ?? 0;
+            for (int index = 0; index < slotCount; index++)
+            {
+                if (index < visibleItems.Count) itemSlots[index]?.Setup(visibleItems[index]);
+                else itemSlots[index]?.Clear();
+            }
+            emptyMessageItems?.SetActive(visibleItems.Count == 0);
+            SelectItem(visibleItems.Count > 0 ? 0 : -1);
+        }
+
+        private void ChangeWeaponTab(int direction)
+        {
+            weaponTabIndex = (weaponTabIndex + direction + WeaponCategories.Length) % WeaponCategories.Length;
+            RefreshWeapons();
+        }
+
+        private void UpdateWeaponTabs()
+        {
+            if (weaponTabs == null) return;
+            for (int index = 0; index < weaponTabs.Length; index++) weaponTabs[index]?.SetSelected(index == weaponTabIndex);
+        }
+
+        private void SelectMainMenuWrapped(int direction)
+        {
+            if (mainMenuButtons.Count == 0) return;
+            SelectMainMenu((mainMenuIndex + direction + mainMenuButtons.Count) % mainMenuButtons.Count);
+        }
+
+        private void SelectMainMenu(int index)
+        {
+            if (mainMenuButtons.Count == 0) return;
+            for (int buttonIndex = 0; buttonIndex < mainMenuButtons.Count; buttonIndex++) mainMenuButtons[buttonIndex].SetSelected(buttonIndex == index);
+            mainMenuIndex = index;
+        }
+
+        private void SelectWeaponWrapped(int direction)
+        {
+            if (visibleWeapons.Count == 0) return;
+            SelectWeapon((weaponIndex + direction + visibleWeapons.Count) % visibleWeapons.Count);
+        }
+
+        private void SelectWeapon(int index)
+        {
+            if (weaponSlots != null)
+                for (int slotIndex = 0; slotIndex < weaponSlots.Length; slotIndex++) weaponSlots[slotIndex]?.SetSelected(slotIndex == index);
+            weaponIndex = index;
+        }
+
+        private void SelectItemWrapped(int direction)
+        {
+            if (visibleItems.Count == 0) return;
+            SelectItem((itemIndex + direction + visibleItems.Count) % visibleItems.Count);
+        }
+
+        private void SelectItem(int index)
+        {
+            if (itemSlots != null)
+                for (int slotIndex = 0; slotIndex < itemSlots.Length; slotIndex++) itemSlots[slotIndex]?.SetSelected(slotIndex == index);
+            itemIndex = index;
+        }
+
+        private static string GetStableItemId(ItemData item) => item.Id;
+        private void OnDestroy() => Deinitialize();
     }
-
-    private List<WeaponData> GetAllWeaponsFromInventory()
-    {
-        List<WeaponData> weapons = new List<WeaponData>();
-        
-        if (InventoryManager.Instance == null)
-            return weapons;
-
-        List<ItemData> allItems = InventoryManager.Instance.GetAllItems();
-        
-        foreach (ItemData item in allItems)
-        {
-            WeaponData weapon = item as WeaponData;
-            if (weapon != null && !weapons.Contains(weapon))
-            {
-                weapons.Add(weapon);
-            }
-        }
-
-        return weapons;
-    }
-
-    private int GetAmmoCount(ItemData ammoType)
-    {
-        if (InventoryManager.Instance == null)
-            return 0;
-
-        return InventoryManager.Instance.GetItemQuantity(ammoType);
-    }
-
-    private void HandleWeaponListNavigation(bool moveDown)
-    {
-        List<WeaponData> filteredWeapons = GetFilteredWeapons();
-        
-        if (filteredWeapons.Count == 0)
-        {
-            return;
-        }
-
-        if (moveDown)
-        {
-            int nextIndex = currentSelectedWeaponIndex + 1;
-            if (nextIndex >= filteredWeapons.Count)
-            {
-                nextIndex = 0;
-            }
-            SelectWeaponSlotByIndex(nextIndex);
-        }
-        else
-        {
-            int previousIndex = currentSelectedWeaponIndex - 1;
-            if (previousIndex < 0)
-            {
-                previousIndex = filteredWeapons.Count - 1;
-            }
-            SelectWeaponSlotByIndex(previousIndex);
-        }
-    }
-
-    private void SelectWeaponSlotByIndex(int index)
-    {
-        List<WeaponData> filteredWeapons = GetFilteredWeapons();
-        
-        if (index < 0 || index >= filteredWeapons.Count)
-        {
-            return;
-        }
-
-        if (currentlySelectedWeaponSlot != null)
-        {
-            currentlySelectedWeaponSlot.SetSelected(false);
-        }
-
-        currentSelectedWeaponIndex = index;
-        currentlySelectedWeaponSlot = weaponSlotUIList[index];
-        currentlySelectedWeaponSlot.SetSelected(true);
-    }
-
-    private void OnWeaponSelected()
-    {
-        if (currentlySelectedWeaponSlot != null && currentlySelectedWeaponSlot.GetWeapon() != null)
-        {
-            WeaponData selectedWeapon = currentlySelectedWeaponSlot.GetWeapon();
-            
-            if (InventoryManager.Instance != null && !selectedWeapon.CanUse(InventoryManager.Instance))
-            {
-                Debug.Log("Sem munição para usar esta arma!");
-                return;
-            }
-            
-            if (RecentWeaponsManager.Instance != null)
-            {
-                RecentWeaponsManager.Instance.AddRecentWeapon(selectedWeapon);
-            }
-
-            if (selectedWeapon.requiresAmmo && InventoryManager.Instance != null)
-            {
-                InventoryManager.Instance.ConsumeItem(selectedWeapon.ammoType, 1);
-            }
-
-            CloseAttackMenu();
-
-            if (BattleManager.Instance != null)
-            {
-                BattleManager.Instance.PlayerAttack(selectedWeapon);
-            }
-        }
-    }
-
-    private void FindOrCreateItemSlots()
-    {
-        if (itemSlotsParent != null)
-        {
-            ItemSlotUI[] existingSlots = itemSlotsParent.GetComponentsInChildren<ItemSlotUI>(true);
-            
-            foreach (ItemSlotUI slot in existingSlots)
-            {
-                itemSlotUIList.Add(slot);
-                slot.gameObject.SetActive(false);
-            }
-        }
-    }
-
-    private void OpenItemsMenu()
-    {
-        if (itensMenuBackground != null)
-        {
-            itensMenuBackground.SetActive(true);
-            isItemsMenuOpen = true;
-            RefreshItemsList();
-
-            itemsMenuState = new UIState("ItemsMenu", OnItemsMenuBack);
-            if (UINavigationManager.Instance != null)
-            {
-                UINavigationManager.Instance.PushState(itemsMenuState);
-            }
-        }
-    }
-
-    private void OnItemsMenuBack()
-    {
-        CloseItemsMenu();
-        OpenMainMenu();
-    }
-
-    private void CloseItemsMenu()
-    {
-        if (itensMenuBackground != null)
-        {
-            itensMenuBackground.SetActive(false);
-            isItemsMenuOpen = false;
-            
-            if (currentlySelectedItemSlot != null)
-            {
-                currentlySelectedItemSlot.SetSelected(false);
-                currentlySelectedItemSlot = null;
-            }
-        }
-
-        if (UINavigationManager.Instance != null)
-        {
-            UINavigationManager.Instance.PopState();
-        }
-    }
-
-    private void RefreshItemsList()
-    {
-        List<ItemData> consumableItems = new List<ItemData>();
-        
-        if (InventoryManager.Instance != null)
-        {
-            consumableItems = InventoryManager.Instance.GetAllItemsOfCategory(ItemCategory.Consumable);
-        }
-
-        for (int i = 0; i < itemSlotUIList.Count; i++)
-        {
-            if (i < consumableItems.Count)
-            {
-                int quantity = InventoryManager.Instance.GetItemQuantity(consumableItems[i]);
-                itemSlotUIList[i].Setup(consumableItems[i], quantity);
-            }
-            else
-            {
-                itemSlotUIList[i].Setup(null, 0);
-            }
-        }
-
-        if (currentlySelectedItemSlot != null)
-        {
-            currentlySelectedItemSlot.SetSelected(false);
-            currentlySelectedItemSlot = null;
-        }
-
-        if (consumableItems.Count == 0)
-        {
-            if (emptyMessageItems != null)
-            {
-                emptyMessageItems.SetActive(true);
-            }
-        }
-        else
-        {
-            if (emptyMessageItems != null)
-            {
-                emptyMessageItems.SetActive(false);
-            }
-
-            SelectItemSlotByIndex(0);
-        }
-    }
-
-    private void HandleItemsListNavigation(bool moveDown)
-    {
-        List<ItemData> consumableItems = new List<ItemData>();
-        
-        if (InventoryManager.Instance != null)
-        {
-            consumableItems = InventoryManager.Instance.GetAllItemsOfCategory(ItemCategory.Consumable);
-        }
-        
-        if (consumableItems.Count == 0)
-        {
-            return;
-        }
-
-        if (moveDown)
-        {
-            int nextIndex = currentSelectedItemIndex + 1;
-            if (nextIndex >= consumableItems.Count)
-            {
-                nextIndex = 0;
-            }
-            SelectItemSlotByIndex(nextIndex);
-        }
-        else
-        {
-            int previousIndex = currentSelectedItemIndex - 1;
-            if (previousIndex < 0)
-            {
-                previousIndex = consumableItems.Count - 1;
-            }
-            SelectItemSlotByIndex(previousIndex);
-        }
-    }
-
-    private void SelectItemSlotByIndex(int index)
-    {
-        List<ItemData> consumableItems = new List<ItemData>();
-        
-        if (InventoryManager.Instance != null)
-        {
-            consumableItems = InventoryManager.Instance.GetAllItemsOfCategory(ItemCategory.Consumable);
-        }
-        
-        if (index < 0 || index >= consumableItems.Count)
-        {
-            return;
-        }
-
-        if (currentlySelectedItemSlot != null)
-        {
-            currentlySelectedItemSlot.SetSelected(false);
-        }
-
-        currentSelectedItemIndex = index;
-        currentlySelectedItemSlot = itemSlotUIList[index];
-        currentlySelectedItemSlot.SetSelected(true);
-    }
-
-    private void OnItemSelected()
-    {
-        if (currentlySelectedItemSlot != null && currentlySelectedItemSlot.GetItemData() != null)
-        {
-            ItemData selectedItem = currentlySelectedItemSlot.GetItemData();
-            
-            if (InventoryManager.Instance == null)
-                return;
-
-            int availableQuantity = InventoryManager.Instance.GetItemQuantity(selectedItem);
-            if (availableQuantity <= 0)
-            {
-                Debug.Log("Você não possui este item!");
-                return;
-            }
-
-            ConsumableData consumable = selectedItem as ConsumableData;
-            if (consumable == null)
-            {
-                Debug.Log("Este item não é consumível!");
-                return;
-            }
-
-            InventoryManager.Instance.ConsumeItem(selectedItem, 1);
-
-            CloseItemsMenu();
-
-            if (BattleManager.Instance != null)
-            {
-                BattleManager.Instance.PlayerUseItem(consumable);
-            }
-        }
-    }
-}
-
-
 }

@@ -1,155 +1,124 @@
-namespace HorrorRPG.Battle
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
+using System;
 using HorrorRPG.Core;
 using HorrorRPG.Input;
-
-
 using UnityEngine;
-using System;
 
-public class AttackTimingBar : MonoBehaviour
+namespace HorrorRPG.Battle
 {
-    public static AttackTimingBar Instance { get; private set; }
-    
-    private const float INPUT_DELAY = 0.15f;
-    
-    private WeaponData currentWeapon;
-    private float currentPosition = 0f;
-    private float direction = 1f;
-    private bool isActive = false;
-    private Action<AttackResult> onComplete;
-    private float speedModifier = 1f;
-    private float inputDelayTimer = 0f;
-    private GameInputReader inputReader;
-    
-    private void Awake()
+    /// <summary>Resolves one cancelable weapon timing window.</summary>
+    public class AttackTimingBar : MonoBehaviour, IGameContextReceiver
     {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
-    
-    private void OnEnable()
-    {
-        inputReader = FindFirstObjectByType<GameInputReader>();
-        if (inputReader != null)
-        {
-            inputReader.TimingConfirmPerformed += HandleTimingConfirm;
-        }
-    }
+        private const float InputDelay = 0.15f;
+        private const float MinimumSpeedModifier = 0.1f;
+        private const float MaximumSpeedModifier = 2f;
 
-    private void OnDisable()
-    {
-        if (inputReader != null)
-        {
-            inputReader.TimingConfirmPerformed -= HandleTimingConfirm;
-        }
-    }
+        [SerializeField] private AttackTimingUI timingView;
 
-    private void HandleTimingConfirm()
-    {
-        if (isActive && inputDelayTimer <= 0f)
-        {
-            EvaluateAndComplete();
-        }
-    }
+        private GameInputReader inputReader;
+        private WeaponData currentWeapon;
+        private Action<AttackResult> completed;
+        private float currentPosition;
+        private float direction = 1f;
+        private float speedModifier = 1f;
+        private float inputDelayTimer;
+        private bool active;
+        private bool subscribed;
 
-    public void StartTiming(WeaponData weapon, Action<AttackResult> callback)
-    {
-        currentWeapon = weapon;
-        onComplete = callback;
-        currentPosition = 0f;
-        direction = 1f;
-        isActive = true;
-        inputDelayTimer = INPUT_DELAY;
-        
-        if (AttackTimingUI.Instance != null)
+        /// <summary>Injects timing input for the active scene.</summary>
+        public void Initialize(GameContext context)
         {
-            AttackTimingUI.Instance.Show();
-            AttackTimingUI.Instance.SetupZones(weapon);
+            inputReader = context?.InputReader ?? throw new ArgumentNullException(nameof(context));
+            Subscribe();
         }
-    }
-    
-    public void SetSpeedModifier(float modifier)
-    {
-        speedModifier = Mathf.Clamp(modifier, 0.1f, 2f);
-    }
-    
-    public void ResetSpeedModifier()
-    {
-        speedModifier = 1f;
-    }
-    
-    private void Update()
-    {
-        if (!isActive || currentWeapon == null)
-            return;
-        
-        if (inputDelayTimer > 0f)
+
+        /// <summary>Cancels timing and releases input callbacks.</summary>
+        public void Deinitialize()
         {
-            inputDelayTimer -= Time.deltaTime;
+            Cancel();
+            Unsubscribe();
+            inputReader = null;
         }
-        
-        currentPosition += direction * currentWeapon.markerSpeed * speedModifier * Time.deltaTime;
-        
-        if (currentPosition >= 1f)
+
+        /// <summary>Begins one timing request with exactly one completion callback.</summary>
+        public void Begin(WeaponData weapon, Action<AttackResult> completion)
         {
-            currentPosition = 1f;
-            direction = -1f;
-        }
-        else if (currentPosition <= 0f)
-        {
+            if (weapon == null) throw new ArgumentNullException(nameof(weapon));
+            if (completion == null) throw new ArgumentNullException(nameof(completion));
+            Cancel();
+            currentWeapon = weapon;
+            completed = completion;
             currentPosition = 0f;
             direction = 1f;
+            inputDelayTimer = InputDelay;
+            active = true;
+            timingView?.Show();
+            timingView?.SetupZones(weapon);
+            timingView?.UpdateMarkerPosition(currentPosition);
         }
-        
-        if (AttackTimingUI.Instance != null)
+
+        /// <summary>Cancels the active request without invoking its callback.</summary>
+        public void Cancel()
         {
-            AttackTimingUI.Instance.UpdateMarkerPosition(currentPosition);
-        }
-        
-        if (inputDelayTimer <= 0f)
-        {
+            active = false;
+            currentWeapon = null;
+            completed = null;
+            speedModifier = 1f;
             inputDelayTimer = 0f;
+            timingView?.Hide();
         }
 
-    }
-    
-    private void EvaluateAndComplete()
-    {
-        isActive = false;
-        
-        AttackResult result = currentWeapon.EvaluateTimingPosition(currentPosition);
-        
-        if (AttackTimingUI.Instance != null)
+        /// <summary>Sets the speed modifier used by the next active timing request.</summary>
+        public void SetSpeedModifier(float modifier)
         {
-            AttackTimingUI.Instance.Hide();
+            speedModifier = Mathf.Clamp(modifier, MinimumSpeedModifier, MaximumSpeedModifier);
         }
-        
-        ResetSpeedModifier();
-        
-        onComplete?.Invoke(result);
-    }
-    
-    public float GetCurrentPosition()
-    {
-        return currentPosition;
-    }
-    
-    public bool IsActive()
-    {
-        return isActive;
-    }
-}
 
+        private void OnEnable() => Subscribe();
+        private void OnDisable() => Unsubscribe();
 
+        private void Update()
+        {
+            if (!active || currentWeapon == null) return;
+            inputDelayTimer = Mathf.Max(0f, inputDelayTimer - Time.deltaTime);
+            currentPosition += direction * currentWeapon.markerSpeed * speedModifier * Time.deltaTime;
+            if (currentPosition >= 1f)
+            {
+                currentPosition = 1f;
+                direction = -1f;
+            }
+            else if (currentPosition <= 0f)
+            {
+                currentPosition = 0f;
+                direction = 1f;
+            }
+            timingView?.UpdateMarkerPosition(currentPosition);
+        }
+
+        private void HandleTimingConfirm()
+        {
+            if (!active || inputDelayTimer > 0f || currentWeapon == null) return;
+            AttackResult result = currentWeapon.EvaluateTimingPosition(currentPosition);
+            Action<AttackResult> callback = completed;
+            active = false;
+            currentWeapon = null;
+            completed = null;
+            speedModifier = 1f;
+            timingView?.Hide();
+            callback?.Invoke(result);
+        }
+
+        private void Subscribe()
+        {
+            if (!isActiveAndEnabled || inputReader == null || subscribed) return;
+            inputReader.TimingConfirmPerformed += HandleTimingConfirm;
+            subscribed = true;
+        }
+
+        private void Unsubscribe()
+        {
+            if (!subscribed || inputReader == null) return;
+            inputReader.TimingConfirmPerformed -= HandleTimingConfirm;
+            subscribed = false;
+        }
+    }
 }

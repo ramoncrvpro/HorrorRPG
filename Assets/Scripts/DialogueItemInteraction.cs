@@ -1,168 +1,118 @@
-namespace HorrorRPG.Dialogue
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
 using HorrorRPG.Core;
-using HorrorRPG.Input;
 using HorrorRPG.Interaction;
-
-
-
-using System.Collections;
+using HorrorRPG.Inventory;
 using UnityEngine;
 
-public class DialogueItemInteraction : MonoBehaviour, IInteractable
+namespace HorrorRPG.Dialogue
 {
-    [Header("Dialogue Settings")]
-    [SerializeField] private DialogueData dialogueData;
-
-    [Header("Item Configuration")]
-    [SerializeField] private ItemData itemData;
-    [SerializeField] private int quantity = 1;
-
-    [Header("Interaction Settings")]
-    [SerializeField] private bool canBePickedUp = true;
-    [SerializeField] private string customPrompt = "";
-    [SerializeField] private bool oneTimeOnly = false;
-
-    private bool hasInteracted = false;
-    private bool isWaitingForDialogue = false;
-
-    public void Interact()
+    public class DialogueItemInteraction : MonoBehaviour, IInteractable, IGameContextReceiver
     {
-        if (!CanInteract())
-            return;
+        private const string DefaultPrompt = "Pressione E para interagir";
 
-        if (DialogueSystem.Instance != null && dialogueData != null)
+        [Header("Dialogue Settings")]
+        [SerializeField] private DialogueData dialogueData;
+        [Header("Item Configuration")]
+        [SerializeField] private ItemData itemData;
+        [SerializeField] private int quantity = 1;
+        [Header("Interaction Settings")]
+        [SerializeField] private bool canBePickedUp = true;
+        [SerializeField] private string customPrompt = string.Empty;
+        [SerializeField] private bool oneTimeOnly;
+        [Header("Persistence")]
+        [SerializeField] private WorldObjectId worldObjectId;
+
+        private GameContext gameContext;
+        private DialogueHandle activeHandle;
+        private bool hasActiveHandle;
+        private bool hasInteracted;
+
+        /// <summary>Injects services used by the dialogue and inventory transaction.</summary>
+        public void Initialize(GameContext context)
         {
-            DialogueSystem.Instance.StartDialogue(dialogueData);
-            isWaitingForDialogue = true;
-            StartCoroutine(WaitForDialogueEnd());
-
-            if (oneTimeOnly)
+            gameContext = context ?? throw new System.ArgumentNullException(nameof(context));
+            if (worldObjectId == null) worldObjectId = GetComponent<WorldObjectId>();
+            if (worldObjectId != null && context.Session.World.IsCompleted(worldObjectId.Value))
             {
                 hasInteracted = true;
+                canBePickedUp = false;
             }
         }
-    }
 
-    private IEnumerator WaitForDialogueEnd()
-    {
-        yield return null;
-
-        while (DialogueSystem.Instance != null && DialogueSystem.Instance.IsDialogueActive())
+        /// <summary>Releases the single completion callback owned by this interaction.</summary>
+        public void Deinitialize()
         {
-            yield return null;
+            UnsubscribeFromCompletion();
+            gameContext = null;
         }
 
-        isWaitingForDialogue = false;
-
-        if (canBePickedUp && itemData != null)
+        /// <summary>Starts one confirmation dialogue and resolves the item transaction on completion.</summary>
+        public void Interact(in InteractionContext context)
         {
-            ShowItemConfirmation();
+            if (!CanInteract(in context)) return;
+            gameContext = context.Game;
+            activeHandle = context.Dialogue.Start(new DialogueRequest(dialogueData.sentences, true, dialogueData.fastText));
+            hasActiveHandle = true;
+            context.Dialogue.Ended += HandleDialogueEnded;
         }
-    }
 
-    private void ShowItemConfirmation()
-    {
-        string confirmationMessage = $"Você quer adicionar {quantity}x {itemData.itemName} ao seu inventário?";
-        
-        DialogueSystem.Instance.StartDialogueWithConfirmation(
-            confirmationMessage,
-            OnItemConfirmed,
-            OnItemCancelled,
-            dialogueData
-        );
-    }
-
-    private void OnItemConfirmed()
-    {
-        CollectItems();
-    }
-
-    private void OnItemCancelled()
-    {
-        if (oneTimeOnly)
+        /// <summary>Returns the configured interaction prompt.</summary>
+        public string GetInteractionPrompt(in InteractionContext context)
         {
-            hasInteracted = true;
+            return string.IsNullOrWhiteSpace(customPrompt) ? DefaultPrompt : customPrompt;
         }
-    }
 
-    private void CollectItems()
-    {
-        if (!canBePickedUp || itemData == null)
-            return;
-
-        StartCoroutine(CollectItemsCoroutine());
-    }
-
-    private IEnumerator CollectItemsCoroutine()
-    {
-        if (InventoryManager.Instance != null)
+        /// <summary>Checks item, dialogue and one-time completion state.</summary>
+        public bool CanInteract(in InteractionContext context)
         {
-            yield return InventoryManager.Instance.AddItemCoroutine(itemData, quantity);
+            return canBePickedUp
+                && itemData != null
+                && dialogueData != null
+                && quantity > 0
+                && (!oneTimeOnly || !hasInteracted)
+                && !hasActiveHandle
+                && !IsDialogueActive(context.Dialogue.State);
+        }
 
-            int addedQuantity = InventoryManager.Instance.GetLastAddedQuantity();
+        /// <summary>Enables or disables item collection.</summary>
+        public void SetCanInteract(bool value) => canBePickedUp = value;
 
-            if (addedQuantity > 0)
+        /// <summary>Clears the one-time completion state for a new session.</summary>
+        public void ResetInteraction() => hasInteracted = false;
+
+        private void HandleDialogueEnded(DialogueEndedEvent result)
+        {
+            if (!hasActiveHandle || !result.Handle.Equals(activeHandle)) return;
+            if (result.Reason == DialogueEndReason.Completed && gameContext != null)
             {
-                quantity -= addedQuantity;
-
+                InventoryOperationResult inventoryResult = gameContext.Inventory.AddItem(itemData, quantity);
+                quantity -= inventoryResult.ProcessedQuantity;
                 if (quantity <= 0)
                 {
                     canBePickedUp = false;
+                    if (oneTimeOnly) hasInteracted = true;
+                    if (worldObjectId != null) gameContext.Session.World.MarkCompleted(worldObjectId.Value);
                 }
             }
+            UnsubscribeFromCompletion();
+        }
+
+        private void UnsubscribeFromCompletion()
+        {
+            if (gameContext != null) gameContext.Dialogue.Ended -= HandleDialogueEnded;
+            hasActiveHandle = false;
+            activeHandle = default;
+        }
+
+        private static bool IsDialogueActive(DialogueState state)
+        {
+            return state == DialogueState.Typing
+                || state == DialogueState.AwaitingAdvance
+                || state == DialogueState.AwaitingConfirmation;
+        }
+
+        private void OnValidate()
+        {
+            quantity = Mathf.Max(1, quantity);
         }
     }
-
-    public string GetInteractionPrompt()
-    {
-        if (!string.IsNullOrEmpty(customPrompt))
-        {
-            return customPrompt;
-        }
-
-        if (itemData != null)
-        {
-            return "Pressione E para interagir";
-        }
-
-        return "Pressione E para interagir";
-    }
-
-    public bool CanInteract()
-    {
-        if (!canBePickedUp)
-        {
-            return false;
-        }
-
-        if (oneTimeOnly && hasInteracted)
-        {
-            return false;
-        }
-
-        if (isWaitingForDialogue)
-        {
-            return false;
-        }
-
-        return dialogueData != null && itemData != null;
-    }
-
-    public void SetCanInteract(bool value)
-    {
-        canBePickedUp = value;
-    }
-
-    public void ResetInteraction()
-    {
-        hasInteracted = false;
-    }
-}
-
-
 }

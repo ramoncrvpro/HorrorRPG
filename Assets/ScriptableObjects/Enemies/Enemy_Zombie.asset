@@ -12,7 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f5cc3c91a92d104297520ead840442d, type: 3}
   m_Name: Enemy_Zombie
   m_EditorClassIdentifier: 
-  enemyName: Zombie
-  maxHealth: 50
-  baseDamage: 15
-  category: 3
+  stableId: 842725317aa541b888acf83e7703cae7
+  enemyNameValue: Zombie
+  maxHealthValue: 50
+  baseDamageValue: 15
+  categoryValue: 3
+  availableAttacksValue:
+  - {fileID: 11400000, guid: 467ed421dbee0e945a227ec9350a2364, type: 2}

@@ -1,59 +1,32 @@
-namespace HorrorRPG.Battle
-{
 using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
-
-
 using UnityEngine;
 
-public class DefenseEffectsManager : MonoBehaviour
+namespace HorrorRPG.Battle
 {
-    public static DefenseEffectsManager Instance { get; private set; }
-
-    [Header("Hand Effects")]
-    [SerializeField] private DefenseEffectUI leftHandEffect;
-    [SerializeField] private DefenseEffectUI middleHandEffect;
-    [SerializeField] private DefenseEffectUI rightHandEffect;
-
-    private void Awake()
+    /// <summary>Displays the defense effect matching the selected region.</summary>
+    public class DefenseEffectsManager : MonoBehaviour
     {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
+        [SerializeField] private DefenseEffectUI leftHandEffect;
+        [SerializeField] private DefenseEffectUI middleHandEffect;
+        [SerializeField] private DefenseEffectUI rightHandEffect;
 
-    public void TriggerEffect(DefensePosition position)
-    {
-        switch (position)
+        /// <summary>Triggers one positional defense effect.</summary>
+        public void TriggerEffect(DefensePosition position)
         {
-            case DefensePosition.Left:
-                leftHandEffect?.Trigger();
-                break;
-            case DefensePosition.Up:
-                middleHandEffect?.Trigger();
-                break;
-            case DefensePosition.Right:
-                rightHandEffect?.Trigger();
-                break;
+            switch (position)
+            {
+                case DefensePosition.Left: leftHandEffect?.Trigger(); break;
+                case DefensePosition.Up: middleHandEffect?.Trigger(); break;
+                case DefensePosition.Right: rightHandEffect?.Trigger(); break;
+            }
+        }
+
+        /// <summary>Immediately hides every defense effect.</summary>
+        public void HideAllEffects()
+        {
+            leftHandEffect?.ForceHide();
+            middleHandEffect?.ForceHide();
+            rightHandEffect?.ForceHide();
         }
     }
-
-    public void HideAllEffects()
-    {
-        leftHandEffect?.ForceHide();
-        middleHandEffect?.ForceHide();
-        rightHandEffect?.ForceHide();
-    }
-}
-
-
 }

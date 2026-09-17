@@ -1,11 +1,6 @@
 namespace HorrorRPG.Battle
 {
 using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
 
 
 using UnityEngine;
@@ -14,8 +9,6 @@ using System;
 
 public class BattleTransitionEffects : MonoBehaviour
 {
-    public static BattleTransitionEffects Instance { get; private set; }
-
     [Header("References")]
     [SerializeField] private GameObject effectsObject;
     [SerializeField] private Image fadeImage;
@@ -27,17 +20,7 @@ public class BattleTransitionEffects : MonoBehaviour
     [SerializeField] private float maxScale = 10f;
     [SerializeField] private LeanTweenType scaleEasing = LeanTweenType.easeOutQuad;
 
-    private void Awake()
-    {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
+
 
     public void PlayBattleStartEffects(Action onComplete = null)
     {

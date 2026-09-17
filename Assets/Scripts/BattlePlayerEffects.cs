@@ -1,13 +1,6 @@
 namespace HorrorRPG.Battle
 {
 using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
-using HorrorRPG.Player;
-
 
 
 using UnityEngine;
@@ -23,8 +16,6 @@ public enum DefenseType
 
 public class BattlePlayerEffects : MonoBehaviour
 {
-    public static BattlePlayerEffects Instance { get; private set; }
-
     [Header("Damage Flash Settings")]
     [SerializeField] private Image damageFlashImage;
     [SerializeField] private float flashDuration = 0.3f;
@@ -48,16 +39,6 @@ public class BattlePlayerEffects : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-            return;
-        }
-
         if (damageFlashImage != null)
         {
             Color color = damageFlashImage.color;

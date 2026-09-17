@@ -1,102 +1,79 @@
-namespace HorrorRPG.Interaction
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
-
-
 using System.Collections;
+using HorrorRPG.Core;
+using HorrorRPG.Inventory;
+using HorrorRPG.Presentation;
 using UnityEngine;
 
-public class DoorInteraction : MonoBehaviour, IInteractable
+namespace HorrorRPG.Interaction
 {
-    [Header("Lock Settings")]
-    [SerializeField] private bool isLocked = false;
-    [SerializeField] private ItemData requiredKey;
-
-    [Header("Animation Settings")]
-    [SerializeField] private SpriteSheetAnimator doorAnimator;
-    [SerializeField] private int openStartFrame = 0;
-    [SerializeField] private int openEndFrame = 15;
-
-    [Header("Door Objects")]
-    [SerializeField] private GameObject objectToDisable;
-    [SerializeField] private float disableDelay = 0.5f;
-
-    private bool isOpening = false;
-
-    public void Interact()
+    public class DoorInteraction : MonoBehaviour, IInteractable, IGameContextReceiver
     {
-        if (isOpening) return;
+        private const string LockedPrompt = "Porta trancada";
+        private const string OpenPrompt = "Pressione E para abrir";
 
-        if (isLocked)
+        [Header("Lock Settings")]
+        [SerializeField] private bool isLocked;
+        [SerializeField] private ItemData requiredKey;
+        [SerializeField] private bool consumeRequiredKey;
+        [Header("Animation Settings")]
+        [SerializeField] private SpriteRendererAnimator doorAnimator;
+        [Header("Door Objects")]
+        [SerializeField] private GameObject objectToDisable;
+        [SerializeField] private float disableDelay = 0.5f;
+        [Header("Persistence")]
+        [SerializeField] private WorldObjectId worldObjectId;
+
+        private bool isOpening;
+
+        /// <summary>Applies an opened door state restored from the runtime session.</summary>
+        public void Initialize(GameContext context)
         {
-            if (InventoryManager.Instance != null && requiredKey != null)
+            if (context == null) throw new System.ArgumentNullException(nameof(context));
+            if (worldObjectId == null) worldObjectId = GetComponent<WorldObjectId>();
+            if (worldObjectId == null || !context.Session.World.IsCompleted(worldObjectId.Value)) return;
+            isLocked = false;
+            isOpening = true;
+            if (objectToDisable != null) objectToDisable.SetActive(false);
+        }
+
+        /// <summary>Stops pending door presentation when the scene is released.</summary>
+        public void Deinitialize() => StopAllCoroutines();
+
+        /// <summary>Unlocks with the configured key and starts the door sequence once.</summary>
+        public void Interact(in InteractionContext context)
+        {
+            if (!CanInteract(in context)) return;
+            if (isLocked)
             {
-                if (InventoryManager.Instance.HasItem(requiredKey, 1))
-                {
-                    UnlockDoor();
-                    OpenDoor();
-                }
+                if (requiredKey == null || !context.Inventory.HasItem(requiredKey, 1)) return;
+                if (consumeRequiredKey && !context.Inventory.RemoveItem(requiredKey, 1).IsComplete) return;
+                isLocked = false;
             }
+            isOpening = true;
+            if (worldObjectId != null) context.Game.Session.World.MarkCompleted(worldObjectId.Value);
+            if (doorAnimator != null) doorAnimator.Play();
+            if (objectToDisable != null) StartCoroutine(DisableObjectAfterDelay());
         }
-        else
+
+        /// <summary>Returns a prompt describing the door's current lock state.</summary>
+        public string GetInteractionPrompt(in InteractionContext context)
         {
-            OpenDoor();
+            if (!isLocked) return OpenPrompt;
+            return requiredKey != null ? $"{LockedPrompt} - {requiredKey.itemName} necessária" : LockedPrompt;
         }
-    }
 
-    public string GetInteractionPrompt()
-    {
-        if (isLocked)
+        /// <summary>Prevents re-entry after the opening sequence starts.</summary>
+        public bool CanInteract(in InteractionContext context) => !isOpening;
+
+        private IEnumerator DisableObjectAfterDelay()
         {
-            if (requiredKey != null)
-            {
-                return $"Porta trancada - {requiredKey.itemName} necessária";
-            }
-            return "Porta trancada";
+            yield return new WaitForSeconds(disableDelay);
+            if (objectToDisable != null) objectToDisable.SetActive(false);
         }
-        return "Pressione E para abrir";
-    }
 
-    public bool CanInteract()
-    {
-        return !isOpening;
-    }
-
-    private void UnlockDoor()
-    {
-        isLocked = false;
-    }
-
-    private void OpenDoor()
-    {
-        isOpening = true;
-
-        if (doorAnimator != null)
+        private void OnValidate()
         {
-            doorAnimator.PlayAnimation(openStartFrame, openEndFrame, false);
-        }
-
-        if (objectToDisable != null)
-        {
-            StartCoroutine(DisableObjectAfterDelay(disableDelay));
+            disableDelay = Mathf.Max(0f, disableDelay);
         }
     }
-
-    private IEnumerator DisableObjectAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-
-        if (objectToDisable != null)
-        {
-            objectToDisable.SetActive(false);
-        }
-    }
-}
-
-
 }

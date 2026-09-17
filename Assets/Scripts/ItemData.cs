@@ -1,73 +1,41 @@
+using System;
+using UnityEngine;
+using UnityEngine.Serialization;
+
 namespace HorrorRPG.Inventory
 {
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
-using HorrorRPG.Core;
-using HorrorRPG.Input;
+    public enum ItemCategory { Consumable, Equipable, Key }
 
-
-using UnityEngine;
-
-public enum ItemCategory
-{
-    Consumable,
-    Equipable,
-    Key
-}
-
-[CreateAssetMenu(fileName = "New Item", menuName = "Inventory/Item")]
-public class ItemData : ScriptableObject
-{
-    [Header("Item Info")]
-    public string itemName;
-    public string description;
-    public Sprite icon;
-
-    [Header("Classification")]
-    public ItemCategory category = ItemCategory.Consumable;
-
-    [Header("Properties")]
-    public int maxStackSize = 99;
-    public bool disposable = true;
-    
-    public bool isStackable => maxStackSize > 1;
-}
-
-[System.Serializable]
-public class InventorySlot
-{
-    public ItemData itemData;
-    public int quantity;
-
-    public InventorySlot(ItemData data, int qty)
+    [CreateAssetMenu(fileName = "New Item", menuName = "Inventory/Item")]
+    public class ItemData : ScriptableObject
     {
-        itemData = data;
-        quantity = qty;
-    }
+        [SerializeField] private string stableId;
+        [Header("Item Info")]
+        [SerializeField, FormerlySerializedAs("itemName")] private string itemNameValue;
+        [SerializeField, FormerlySerializedAs("description")] private string descriptionValue;
+        [SerializeField, FormerlySerializedAs("icon")] private Sprite iconValue;
+        [Header("Classification")]
+        [SerializeField, FormerlySerializedAs("category")] private ItemCategory categoryValue = ItemCategory.Consumable;
+        [Header("Properties")]
+        [SerializeField, FormerlySerializedAs("maxStackSize")] private int maxStackSizeValue = 99;
+        [SerializeField, FormerlySerializedAs("disposable")] private bool disposableValue = true;
 
-    public bool CanStack(ItemData data)
-    {
-        return itemData == data && itemData.isStackable && quantity < itemData.maxStackSize;
-    }
+        public string Id => stableId;
+        public string itemName => itemNameValue;
+        public string description => descriptionValue;
+        public Sprite icon => iconValue;
+        public ItemCategory category => categoryValue;
+        public int maxStackSize => maxStackSizeValue;
+        public bool disposable => disposableValue;
+        public bool isStackable => maxStackSizeValue > 1;
 
-    public int AddQuantity(int amount)
-    {
-        int totalAmount = quantity + amount;
-        
-        if (totalAmount > itemData.maxStackSize)
+        protected virtual void OnValidate()
         {
-            quantity = itemData.maxStackSize;
-            return totalAmount - itemData.maxStackSize;
-        }
-        else
-        {
-            quantity = totalAmount;
-            return 0;
+            if (string.IsNullOrWhiteSpace(stableId)) stableId = Guid.NewGuid().ToString("N");
+            stableId = stableId.Trim();
+            itemNameValue = itemNameValue?.Trim() ?? string.Empty;
+            descriptionValue ??= string.Empty;
+            maxStackSizeValue = Mathf.Max(1, maxStackSizeValue);
         }
     }
-}
-
-
 }

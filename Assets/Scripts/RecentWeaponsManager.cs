@@ -1,42 +1,45 @@
-namespace HorrorRPG.Inventory
-{
-using HorrorRPG.Battle;
-
 using System.Collections.Generic;
+using HorrorRPG.Battle;
+using HorrorRPG.Core;
 using UnityEngine;
 
-/// <summary>Scene adapter for the in-memory recent weapon order.</summary>
-public class RecentWeaponsManager : MonoBehaviour
+namespace HorrorRPG.Inventory
 {
-    public static RecentWeaponsManager Instance { get; private set; }
-    [SerializeField] private WeaponDatabase weaponDatabase;
-    private const int MaxRecentWeapons = 9;
-    private readonly List<string> recentWeaponIds = new List<string>(MaxRecentWeapons);
+    /// <summary>Scene adapter for session-owned recent weapon order.</summary>
+    public sealed class RecentWeaponsManager : MonoBehaviour, IGameContextReceiver
+    {
+        [SerializeField] private WeaponDatabase weaponDatabase;
 
-    private void Awake()
-    {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
-        Instance = this;
-    }
-    public void AddRecentWeapon(WeaponData weapon)
-    {
-        if (weapon == null) return;
-        string weaponId = weapon.name;
-        recentWeaponIds.Remove(weaponId);
-        recentWeaponIds.Insert(0, weaponId);
-        if (recentWeaponIds.Count > MaxRecentWeapons) recentWeaponIds.RemoveAt(recentWeaponIds.Count - 1);
-    }
-    public List<WeaponData> GetRecentWeapons()
-    {
-        var weapons = new List<WeaponData>();
-        if (weaponDatabase == null) return weapons;
-        foreach (string weaponId in recentWeaponIds)
+        private RecentWeaponsRuntimeState recentWeapons;
+
+        /// <summary>Connects this adapter to session-owned recent weapon state.</summary>
+        public void Initialize(GameContext context)
         {
-            WeaponData weapon = weaponDatabase.GetWeaponByName(weaponId);
-            if (weapon != null) weapons.Add(weapon);
+            recentWeapons = context?.Session.RecentWeapons ?? throw new System.ArgumentNullException(nameof(context));
         }
-        return weapons;
+
+        /// <summary>Releases the session state reference.</summary>
+        public void Deinitialize() => recentWeapons = null;
+
+        /// <summary>Adds a weapon ID to the session-owned recent order.</summary>
+        public void AddRecentWeapon(WeaponData weapon)
+        {
+            if (weapon != null && recentWeapons != null) recentWeapons.Add(GetWeaponId(weapon));
+        }
+
+        /// <summary>Resolves recent weapon IDs through the configured database.</summary>
+        public List<WeaponData> GetRecentWeapons()
+        {
+            var weapons = new List<WeaponData>();
+            if (weaponDatabase == null || recentWeapons == null) return weapons;
+            foreach (string weaponId in recentWeapons.WeaponIds)
+            {
+                WeaponData weapon = weaponDatabase.GetWeaponByName(weaponId);
+                if (weapon != null) weapons.Add(weapon);
+            }
+            return weapons;
+        }
+
+        private static string GetWeaponId(WeaponData weapon) => weapon.Id;
     }
-    private void OnDestroy() { if (Instance == this) Instance = null; }
-}
 }

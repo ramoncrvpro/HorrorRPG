@@ -1,348 +1,170 @@
-namespace HorrorRPG.Dialogue
-{
-using HorrorRPG.Presentation;
-using HorrorRPG.Inventory;
-using HorrorRPG.Battle;
-using HorrorRPG.Dialogue;
 using HorrorRPG.Core;
 using HorrorRPG.Input;
-using HorrorRPG.Player;
-
-
-
-using System;
-using System.Collections;
 using UnityEngine;
-using TMPro;
 
-public class DialogueSystem : MonoBehaviour
+namespace HorrorRPG.Dialogue
 {
-    public static DialogueSystem Instance { get; private set; }
-
-    [Header("UI References")]
-    [SerializeField] private GameObject dialogueBox;
-    [SerializeField] private TextMeshProUGUI dialogueText;
-
-    [Header("Typing Settings")]
-    [SerializeField] private bool fastText = false;
-    [SerializeField] private float typingSpeed = 0.05f;
-
-    [Header("Dialogue Settings")]
-    [SerializeField] private bool stuckDialogue = false;
-    // Advance is provided by GameInputReader.
-
-    [Header("Confirmation Settings")]
-    [SerializeField] private GameObject confirmationBackground;
-    [SerializeField] private ConfirmationMenu confirmationMenu;
-    [SerializeField] private GameInputReader inputReader;
-
-
-    private const string CONTROL_LOCK_ID = "DialogueSystem";
-    private const string CONFIRMATION_LOCK_ID = "DialogueConfirmation";
-
-    private string[] currentSentences;
-    private int currentSentenceIndex;
-    private bool isTyping;
-    private bool isDialogueActive;
-    private Coroutine typingCoroutine;
-    
-    private bool currentFastText;
-    private bool currentStuckDialogue;
-    private bool currentRequiresConfirmation;
-    private bool isConfirmationMenuOpen;
-
-    private Action onConfirmCallback;
-    private Action onCancelCallback;
-
-    private void Awake()
+    /// <summary>Scene controller connecting dialogue domain state, input and presentation.</summary>
+    public class DialogueSystem : MonoBehaviour, IGameContextReceiver
     {
-        if (Instance == null)
+        private const float MinimumTypingSpeed = 0.001f;
+
+        [SerializeField] private DialogueView dialogueView;
+        [SerializeField] private bool fastText;
+        [SerializeField] private float typingSpeed = 0.05f;
+
+        private GameContext gameContext;
+        private DialogueService dialogueService;
+        private GameInputReader inputReader;
+        private DialogueHandle activeHandle;
+        private InputContextLease inputLease;
+        private UINavigationHandle navigationHandle;
+        private UINavigationHandle confirmationHandle;
+        private bool initialized;
+        private bool hasActiveDialogue;
+
+        private void Awake()
         {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
-
-    private void OnEnable()
-    {
-        if (inputReader == null) inputReader = FindFirstObjectByType<GameInputReader>();
-        if (inputReader == null) return;
-        inputReader.AdvancePerformed += HandleAdvance;
-        inputReader.NavigatePerformed += HandleNavigation;
-        inputReader.SubmitPerformed += HandleSubmit;
-        inputReader.CancelPerformed += HandleCancel;
-    }
-
-    private void OnDisable()
-    {
-        if (inputReader == null) return;
-        inputReader.AdvancePerformed -= HandleAdvance;
-        inputReader.NavigatePerformed -= HandleNavigation;
-        inputReader.SubmitPerformed -= HandleSubmit;
-        inputReader.CancelPerformed -= HandleCancel;
-    }
-
-
-
-    private void Start()
-    {
-        if (inputReader == null) inputReader = FindFirstObjectByType<GameInputReader>();
-        if (dialogueBox != null) dialogueBox.SetActive(false);
-    }
-
-    private void HandleAdvance()
-    {
-        if (!isDialogueActive || isConfirmationMenuOpen) return;
-        if (isTyping)
-        {
-            StopTyping();
-            dialogueText.text = currentSentences[currentSentenceIndex];
-            isTyping = false;
-        }
-        else DisplayNextSentence();
-    }
-
-    private void HandleNavigation(Vector2 navigation)
-    {
-        if (isConfirmationMenuOpen) confirmationMenu?.HandleNavigation(navigation);
-    }
-
-    private void HandleSubmit()
-    {
-        if (isConfirmationMenuOpen) confirmationMenu?.ExecuteCurrentSelection();
-    }
-
-    private void HandleCancel()
-    {
-        if (isConfirmationMenuOpen) onCancelCallback?.Invoke();
-        else if (isDialogueActive) EndDialogue();
-    }
-
-
-    public void StartDialogue(DialogueData dialogueData, bool? stuckOverride = null, bool? fastTextOverride = null)
-    {
-        if (dialogueData == null || dialogueData.sentences.Length == 0)
-        {
-            return;
+            if (dialogueView == null) Debug.LogError($"{nameof(DialogueSystem)} requires a {nameof(DialogueView)} on {name}.", this);
         }
 
-        currentFastText = fastTextOverride.HasValue ? fastTextOverride.Value : dialogueData.fastText;
-        currentStuckDialogue = stuckOverride.HasValue ? stuckOverride.Value : dialogueData.stuckDialogue;
-        currentRequiresConfirmation = dialogueData.requiresConfirmation;
-
-        currentSentences = dialogueData.sentences;
-        currentSentenceIndex = 0;
-        isDialogueActive = true;
-
-        onConfirmCallback = null;
-        onCancelCallback = null;
-
-        if (currentStuckDialogue && PlayerControlManager.Instance != null)
+        /// <summary>Injects services and subscribes to dialogue, input and view events.</summary>
+        public void Initialize(GameContext context)
         {
-            PlayerControlManager.Instance.LockControl(CONTROL_LOCK_ID);
-        }
-
-        if (dialogueBox != null)
-        {
-            dialogueBox.SetActive(true);
-        }
-
-        DisplaySentence(currentSentences[currentSentenceIndex]);
-    }
-
-    public void StartDialogueWithConfirmation(string message, Action onConfirm, Action onCancel, DialogueData dialogueData)
-    {
-        currentFastText = dialogueData != null ? dialogueData.fastText : fastText;
-        currentStuckDialogue = dialogueData != null ? dialogueData.stuckDialogue : stuckDialogue;
-        currentRequiresConfirmation = true;
-
-        currentSentences = new string[] { message };
-        currentSentenceIndex = 0;
-        isDialogueActive = true;
-
-        onConfirmCallback = onConfirm;
-        onCancelCallback = onCancel;
-
-        if (currentStuckDialogue && PlayerControlManager.Instance != null)
-        {
-            PlayerControlManager.Instance.LockControl(CONTROL_LOCK_ID);
-        }
-
-        if (dialogueBox != null)
-        {
-            dialogueBox.SetActive(true);
-        }
-
-        DisplaySentence(currentSentences[currentSentenceIndex]);
-    }
-
-    private void DisplaySentence(string sentence)
-    {
-        StopTyping();
-
-        if (currentFastText)
-        {
-            dialogueText.text = sentence;
-            isTyping = false;
-        }
-        else
-        {
-            typingCoroutine = StartCoroutine(TypeSentence(sentence));
-        }
-    }
-
-    private IEnumerator TypeSentence(string sentence)
-    {
-        isTyping = true;
-        dialogueText.text = "";
-
-        foreach (char letter in sentence.ToCharArray())
-        {
-            dialogueText.text += letter;
-            yield return new WaitForSeconds(typingSpeed);
-        }
-
-        isTyping = false;
-    }
-
-    private void DisplayNextSentence()
-    {
-        currentSentenceIndex++;
-
-        if (currentSentenceIndex < currentSentences.Length)
-        {
-            DisplaySentence(currentSentences[currentSentenceIndex]);
-        }
-        else
-        {
-            if (currentRequiresConfirmation)
+            if (initialized) return;
+            gameContext = context ?? throw new System.ArgumentNullException(nameof(context));
+            dialogueService = context.Dialogue;
+            inputReader = context.InputReader;
+            dialogueService.Started += HandleStarted;
+            dialogueService.LineChanged += HandleLineChanged;
+            dialogueService.ConfirmationRequested += HandleConfirmationRequested;
+            dialogueService.Ended += HandleEnded;
+            inputReader.AdvancePerformed += HandleAdvance;
+            inputReader.NavigatePerformed += HandleNavigation;
+            inputReader.SubmitPerformed += HandleSubmit;
+            if (dialogueView != null)
             {
-                ShowConfirmationMenu();
+                dialogueView.TypingCompleted += HandleTypingCompleted;
+                dialogueView.Confirmed += HandleConfirmed;
+                dialogueView.Cancelled += HandleCancelled;
             }
-            else
+            initialized = true;
+        }
+
+        /// <summary>Releases scene-owned callbacks and presentation state.</summary>
+        public void Deinitialize()
+        {
+            if (!initialized) return;
+            dialogueService.Started -= HandleStarted;
+            dialogueService.LineChanged -= HandleLineChanged;
+            dialogueService.ConfirmationRequested -= HandleConfirmationRequested;
+            dialogueService.Ended -= HandleEnded;
+            inputReader.AdvancePerformed -= HandleAdvance;
+            inputReader.NavigatePerformed -= HandleNavigation;
+            inputReader.SubmitPerformed -= HandleSubmit;
+            if (dialogueView != null)
             {
-                EndDialogue();
+                dialogueView.TypingCompleted -= HandleTypingCompleted;
+                dialogueView.Confirmed -= HandleConfirmed;
+                dialogueView.Cancelled -= HandleCancelled;
+                dialogueView.Hide();
             }
+            ReleaseNavigationAndInput();
+            hasActiveDialogue = false;
+            gameContext = null;
+            dialogueService = null;
+            inputReader = null;
+            initialized = false;
         }
-    }
 
-    private void EndDialogue()
-    {
-        StopTyping();
-        isDialogueActive = false;
-
-        if (dialogueBox != null)
+        private void HandleStarted(DialogueHandle handle)
         {
-            dialogueBox.SetActive(false);
+            activeHandle = handle;
+            hasActiveDialogue = true;
+            inputLease = gameContext.Input.Acquire(InputContext.Dialogue, InputBlockReason.Dialogue);
+            navigationHandle = gameContext.Navigation.Push(UIScreenId.Dialogue, CancelActiveDialogue);
+            dialogueView?.Show();
         }
 
-        if (currentStuckDialogue && PlayerControlManager.Instance != null)
+        private void HandleLineChanged(DialogueHandle handle, string line)
         {
-            PlayerControlManager.Instance.UnlockControl(CONTROL_LOCK_ID);
+            if (!hasActiveDialogue || !handle.Equals(activeHandle)) return;
+            dialogueView?.SetLine(line, Mathf.Max(MinimumTypingSpeed, typingSpeed), fastText || dialogueService.CurrentFastText);
         }
 
-        currentSentences = null;
-        currentSentenceIndex = 0;
-    }
-
-    private void StopTyping()
-    {
-        if (typingCoroutine != null)
+        private void HandleTypingCompleted()
         {
-            StopCoroutine(typingCoroutine);
-            typingCoroutine = null;
+            if (hasActiveDialogue && dialogueService.State == DialogueState.Typing) dialogueService.Advance(activeHandle);
         }
-    }
 
-    public bool IsDialogueActive()
-    {
-        return isDialogueActive;
-    }
-
-    public void SetFastText(bool value)
-    {
-        fastText = value;
-    }
-
-    public void SetStuckDialogue(bool value)
-    {
-        stuckDialogue = value;
-    }
-
-    public void SetTypingSpeed(float speed)
-    {
-        typingSpeed = speed;
-    }
-
-    private void ShowConfirmationMenu()
-    {
-        isConfirmationMenuOpen = true;
-        isDialogueActive = false;
-
-        if (PlayerControlManager.Instance != null)
+        private void HandleAdvance()
         {
-            PlayerControlManager.Instance.LockControl(CONFIRMATION_LOCK_ID);
+            if (!hasActiveDialogue || dialogueService.State == DialogueState.AwaitingConfirmation) return;
+            if (dialogueView != null && dialogueView.IsTyping) dialogueView.CompleteTyping();
+            else dialogueService.Advance(activeHandle);
         }
 
-        if (confirmationBackground != null)
+        private void HandleConfirmationRequested(DialogueHandle handle)
         {
-            confirmationBackground.SetActive(true);
+            if (!hasActiveDialogue || !handle.Equals(activeHandle)) return;
+            dialogueView?.ShowConfirmation();
+            confirmationHandle = gameContext.Navigation.Push(UIScreenId.Confirmation, HandleCancelled);
         }
 
-        if (confirmationMenu != null)
+        private void HandleNavigation(Vector2 navigation)
         {
-            confirmationMenu.Show(OnConfirmationAccepted, OnConfirmationCancelled);
+            if (hasActiveDialogue && dialogueService.State == DialogueState.AwaitingConfirmation)
+                dialogueView?.NavigateConfirmation(navigation);
         }
-    }
 
-    private void OnConfirmationAccepted()
-    {
-        CloseConfirmationMenu();
-        onConfirmCallback?.Invoke();
-        EndDialogue();
-        ResetDialogueState();
-    }
-
-    private void OnConfirmationCancelled()
-    {
-        CloseConfirmationMenu();
-        onCancelCallback?.Invoke();
-        EndDialogue();
-        ResetDialogueState();
-    }
-
-    private void CloseConfirmationMenu()
-    {
-        isConfirmationMenuOpen = false;
-
-        if (confirmationMenu != null)
+        private void HandleSubmit()
         {
-            confirmationMenu.Hide();
+            if (hasActiveDialogue && dialogueService.State == DialogueState.AwaitingConfirmation)
+                dialogueView?.SubmitConfirmation();
         }
 
-        if (confirmationBackground != null)
+        private void HandleConfirmed()
         {
-            confirmationBackground.SetActive(false);
+            if (hasActiveDialogue) dialogueService.Confirm(activeHandle);
         }
 
-        if (PlayerControlManager.Instance != null)
+        private void HandleCancelled()
         {
-            PlayerControlManager.Instance.UnlockControl(CONFIRMATION_LOCK_ID);
+            if (hasActiveDialogue) dialogueService.Cancel(activeHandle);
         }
+
+        private void CancelActiveDialogue()
+        {
+            if (hasActiveDialogue) dialogueService.Cancel(activeHandle);
+        }
+
+        private void HandleEnded(DialogueEndedEvent result)
+        {
+            if (!hasActiveDialogue || !result.Handle.Equals(activeHandle)) return;
+            hasActiveDialogue = false;
+            dialogueView?.Hide();
+            ReleaseNavigationAndInput();
+            activeHandle = default;
+        }
+
+        private void ReleaseNavigationAndInput()
+        {
+            if (gameContext != null)
+            {
+                gameContext.Navigation.Pop(confirmationHandle);
+                gameContext.Navigation.Pop(navigationHandle);
+            }
+            confirmationHandle = default;
+            navigationHandle = default;
+            inputLease?.Dispose();
+            inputLease = null;
+        }
+
+        private void OnValidate()
+        {
+            typingSpeed = Mathf.Max(MinimumTypingSpeed, typingSpeed);
+        }
+
+        private void OnDestroy() => Deinitialize();
     }
-
-    private void ResetDialogueState()
-    {
-        currentSentences = null;
-        currentSentenceIndex = 0;
-        currentRequiresConfirmation = false;
-        onConfirmCallback = null;
-        onCancelCallback = null;
-    }
-}
-
-
 }
