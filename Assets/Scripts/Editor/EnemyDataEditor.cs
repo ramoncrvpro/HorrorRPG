@@ -24,11 +24,11 @@ public class EnemyDataEditor : Editor
 
     private void OnEnable()
     {
-        enemyNameProp = serializedObject.FindProperty("enemyName");
-        maxHealthProp = serializedObject.FindProperty("maxHealth");
-        baseDamageProp = serializedObject.FindProperty("baseDamage");
-        categoryProp = serializedObject.FindProperty("category");
-        availableAttacksProp = serializedObject.FindProperty("availableAttacks");
+        enemyNameProp = serializedObject.FindProperty("enemyNameValue");
+        maxHealthProp = serializedObject.FindProperty("maxHealthValue");
+        baseDamageProp = serializedObject.FindProperty("baseDamageValue");
+        categoryProp = serializedObject.FindProperty("categoryValue");
+        availableAttacksProp = serializedObject.FindProperty("availableAttacksValue");
     }
 
     public override void OnInspectorGUI()

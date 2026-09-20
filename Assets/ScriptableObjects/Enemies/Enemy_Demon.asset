@@ -12,9 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f5cc3c91a92d104297520ead840442d, type: 3}
   m_Name: Enemy_Demon
   m_EditorClassIdentifier: 
-  enemyName: Demon
-  maxHealth: 70
-  baseDamage: 20
-  category: 1
-  availableAttacks:
+  stableId: 8d510336baed4899b1029eb1d60a3d7d
+  enemyNameValue: Demon
+  maxHealthValue: 70
+  baseDamageValue: 20
+  categoryValue: 1
+  availableAttacksValue:
   - {fileID: 11400000, guid: c615bc7fb5e7243489b1bd315b745aa5, type: 2}

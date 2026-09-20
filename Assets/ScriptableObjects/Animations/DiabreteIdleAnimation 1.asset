@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 05573c3bb7e213a44b8952302061f38a, type: 3}
+  m_Name: DiabreteIdleAnimation 1
+  m_EditorClassIdentifier: 
+  sprites:
+  - {fileID: 1305901469, guid: 384c3da2066feb346869a6717a09d8cd, type: 3}
+  - {fileID: 1954042299, guid: 384c3da2066feb346869a6717a09d8cd, type: 3}
+  - {fileID: -1441763082, guid: 384c3da2066feb346869a6717a09d8cd, type: 3}
+  - {fileID: 1194597155, guid: 384c3da2066feb346869a6717a09d8cd, type: 3}
+  fps: 6
+  loop: 1
