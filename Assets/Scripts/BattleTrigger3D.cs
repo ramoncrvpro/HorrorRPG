@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using HorrorRPG.Core;
 using HorrorRPG.Presentation;
@@ -16,6 +17,9 @@ namespace HorrorRPG.Battle
         [Header("Dependencies")]
         [SerializeField] private BattleManager battleManager;
         [SerializeField] private WorldObjectId worldObjectId;
+        [Header("Drop Settings")]
+        [SerializeField] private bool overrideDrops;
+        [SerializeField] private List<EnemyDropEntry> overrideDropEntries = new List<EnemyDropEntry>();
         [Header("Trigger Settings")]
         [SerializeField] private bool disableAfterTrigger = true;
 
@@ -42,6 +46,12 @@ namespace HorrorRPG.Battle
             if (worldObjectId != null && gameContext.Session.World.DefeatedEnemies.Contains(worldObjectId.Value)) gameObject.SetActive(false);
         }
 
+        /// <summary>Returns the instance override or the enemy asset's default drop table.</summary>
+        public IReadOnlyList<EnemyDropEntry> GetActiveDropEntries()
+        {
+            return overrideDrops ? overrideDropEntries : enemyData != null ? enemyData.dropEntries : null;
+        }
+
         /// <summary>Releases the battle result callback.</summary>
         public void Deinitialize()
         {
@@ -58,7 +68,7 @@ namespace HorrorRPG.Battle
                 return;
             }
             SpriteRendererAnimator enemyAnimator = enemyRenderer.GetComponent<SpriteRendererAnimator>();
-            if (!battleManager.StartBattle(enemyRenderer, enemyAnimator, enemyData)) return;
+            if (!battleManager.StartBattle(enemyRenderer, enemyAnimator, enemyData, GetActiveDropEntries())) return;
             hasTriggered = true;
             if (triggerCollider != null) triggerCollider.enabled = false;
         }

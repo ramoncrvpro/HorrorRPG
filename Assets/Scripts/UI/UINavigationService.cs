@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace HorrorRPG.Core
 {
     public readonly struct UINavigationHandle { internal UINavigationHandle(Guid id) { Id = id; } internal Guid Id { get; } }
-    public enum UIScreenId { Gameplay, Inventory, Dialogue, Battle, Confirmation }
+    public enum UIScreenId { Gameplay, Inventory, Dialogue, Battle, Confirmation, Drop }
 
     /// <summary>Scene-scoped navigation stack with disposable handles.</summary>
     public sealed class UINavigationService

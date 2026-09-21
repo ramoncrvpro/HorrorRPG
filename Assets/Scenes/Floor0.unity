@@ -1767,6 +1767,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 54338596312228617, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
+      propertyPath: dropView
+      value: 
+      objectReference: {fileID: 2405319463409069940}
     - target: {fileID: 249746792610313375, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -2272,6 +2276,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
+--- !u!114 &2405319463409069940 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4928349343989651992, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
+  m_PrefabInstance: {fileID: 2405319463409069939}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65cc2806054cc6842ac0a1ed72106a70, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &8169193833184790797
 PrefabInstance:
   m_ObjectHideFlags: 0

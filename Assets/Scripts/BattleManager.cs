@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using HorrorRPG.Core;
 using HorrorRPG.Input;
 using HorrorRPG.Inventory;
@@ -26,6 +27,8 @@ namespace HorrorRPG.Battle
         [SerializeField] private BattlePlayerEffects battlePlayerEffects;
         [Header("Transition Effects")]
         [SerializeField] private BattleTransitionEffects transitionEffects;
+        [Header("Drop Presentation")]
+        [SerializeField] private DropView dropView;
         [Header("Enemy Data")]
         [SerializeField] private EnemyData currentEnemyData;
         [Header("Battle Delays")]
@@ -33,6 +36,8 @@ namespace HorrorRPG.Battle
 
         private GameContext gameContext;
         private BattleService battleService;
+        private BattleDropResolver dropResolver;
+        private IReadOnlyList<EnemyDropEntry> activeDropEntries;
         private InputContextLease inputLease;
         private ProjectileAttackHandle activeProjectileAttack;
         private Coroutine enemyAttackCoroutine;
@@ -50,6 +55,11 @@ namespace HorrorRPG.Battle
             if (defenseManager == null) defenseManager = GetComponent<DefenseManager>();
             if (attackTimingBar == null) attackTimingBar = GetComponent<AttackTimingBar>();
             if (projectileManager == null) projectileManager = GetComponent<ProjectileManager>();
+            if (dropView == null)
+            {
+                DropView[] sceneDropViews = FindObjectsByType<DropView>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                if (sceneDropViews.Length > 0) dropView = sceneDropViews[0];
+            }
             if (battleArena != null) battleArena.SetActive(false);
         }
 
@@ -59,6 +69,7 @@ namespace HorrorRPG.Battle
             if (initialized) return;
             gameContext = context ?? throw new ArgumentNullException(nameof(context));
             battleService = context.Battle;
+            dropResolver = new BattleDropResolver();
             battleService.PhaseChanged += HandlePhaseChanged;
             battleService.Ended += HandleBattleEnded;
             if (battleUIManager != null)
@@ -89,11 +100,13 @@ namespace HorrorRPG.Battle
             CleanupPresentation();
             gameContext = null;
             battleService = null;
+            dropResolver = null;
+            activeDropEntries = null;
             initialized = false;
         }
 
         /// <summary>Validates visual dependencies and starts a battle once.</summary>
-        public bool StartBattle(SpriteRenderer sourceEnemyRenderer, SpriteRendererAnimator sourceEnemyAnimator, EnemyData enemyData)
+        public bool StartBattle(SpriteRenderer sourceEnemyRenderer, SpriteRendererAnimator sourceEnemyAnimator, EnemyData enemyData, IReadOnlyList<EnemyDropEntry> dropEntries)
         {
             if (!initialized || battlePresentationActive || sourceEnemyRenderer == null || enemyData == null) return false;
             if (battleArena == null || battleEnemyRenderer == null || battleUIManager == null || attackTimingBar == null || defenseManager == null || projectileManager == null)
@@ -104,6 +117,7 @@ namespace HorrorRPG.Battle
             BattleCommandResult result = battleService.StartBattle(enemyData);
             if (!result.Accepted) return false;
             currentEnemyData = enemyData;
+            activeDropEntries = dropEntries;
             StartCoroutine(StartBattleSequence(sourceEnemyRenderer, sourceEnemyAnimator));
             return true;
         }
@@ -246,6 +260,13 @@ namespace HorrorRPG.Battle
             {
                 enemyAnimationController?.PlayDeadAnimation();
                 yield return new WaitForSeconds(enemyDeathDelay);
+                IReadOnlyList<InventoryEntry> rewards = dropResolver.ResolveAndGrant(activeDropEntries, gameContext.Inventory);
+                activeDropEntries = null;
+                if (rewards.Count > 0 && dropView != null)
+                {
+                    dropView.Open(rewards);
+                    yield return new WaitUntil(() => !dropView.IsOpen);
+                }
             }
 
             bool transitionComplete = transitionEffects == null;
@@ -263,8 +284,10 @@ namespace HorrorRPG.Battle
             battlePresentationActive = false;
             if (battleArena != null) battleArena.SetActive(false);
             battleUIManager?.CloseBattleUI();
+            dropView?.Close();
             inputLease?.Dispose();
             inputLease = null;
+            activeDropEntries = null;
         }
 
         private void OnValidate()

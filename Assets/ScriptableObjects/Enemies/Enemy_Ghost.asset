@@ -12,9 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f5cc3c91a92d104297520ead840442d, type: 3}
   m_Name: Enemy_Ghost
   m_EditorClassIdentifier: 
-  enemyName: Ghost
-  maxHealth: 40
-  baseDamage: 50
-  category: 2
-  availableAttacks:
+  stableId: 6bb746b5f24d48aa83a42c01b750ea31
+  enemyNameValue: Ghost
+  maxHealthValue: 40
+  baseDamageValue: 50
+  categoryValue: 2
+  availableAttacksValue:
   - {fileID: 11400000, guid: c615bc7fb5e7243489b1bd315b745aa5, type: 2}
+  dropEntriesValue:
+  - item: {fileID: 11400000, guid: 6074ec04d709b3f4a91c9c5cfd93b06f, type: 2}
+    minimumQuantity: 1
+    maximumQuantity: 3
+    dropChance: 1

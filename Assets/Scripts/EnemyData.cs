@@ -17,6 +17,8 @@ namespace HorrorRPG.Battle
         [SerializeField, FormerlySerializedAs("category")] private EnemyType categoryValue = EnemyType.None;
         [Header("Attack System")]
         [SerializeField, FormerlySerializedAs("availableAttacks")] private List<AttackData> availableAttacksValue = new List<AttackData>();
+        [Header("Drop System")]
+        [SerializeField] private List<EnemyDropEntry> dropEntriesValue = new List<EnemyDropEntry>();
 
         public string Id => stableId;
         public string enemyName => enemyNameValue;
@@ -24,6 +26,7 @@ namespace HorrorRPG.Battle
         public int baseDamage => baseDamageValue;
         public EnemyType category => categoryValue;
         public IReadOnlyList<AttackData> availableAttacks => availableAttacksValue;
+        public IReadOnlyList<EnemyDropEntry> dropEntries => dropEntriesValue;
 
         /// <summary>Selects a valid attack without allocating a filtered list.</summary>
         public AttackData GetRandomAttack()
@@ -49,6 +52,8 @@ namespace HorrorRPG.Battle
             maxHealthValue = Mathf.Max(1, maxHealthValue);
             baseDamageValue = Mathf.Max(1, baseDamageValue);
             availableAttacksValue ??= new List<AttackData>();
+            dropEntriesValue ??= new List<EnemyDropEntry>();
+            dropEntriesValue.RemoveAll(entry => entry == null);
         }
     }
 }

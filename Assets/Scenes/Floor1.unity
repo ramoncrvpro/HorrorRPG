@@ -2315,6 +2315,10 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 54338596312228617, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
+      propertyPath: dropView
+      value: 
+      objectReference: {fileID: 2124682082}
+    - target: {fileID: 54338596312228617, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
       propertyPath: battleUIManager
       value: 
       objectReference: {fileID: 769368127}
@@ -5808,6 +5812,17 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2124682082 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4928349343989651992, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
+  m_PrefabInstance: {fileID: 769368125}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65cc2806054cc6842ac0a1ed72106a70, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2130256311
 GameObject:
   m_ObjectHideFlags: 0

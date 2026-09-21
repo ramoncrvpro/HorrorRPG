@@ -17,6 +17,7 @@ public class EnemyDataEditor : Editor
     private SerializedProperty baseDamageProp;
     private SerializedProperty categoryProp;
     private SerializedProperty availableAttacksProp;
+    private SerializedProperty dropEntriesProp;
     
     private bool showWeaponPreview = true;
     private bool showValidation = true;
@@ -29,6 +30,7 @@ public class EnemyDataEditor : Editor
         baseDamageProp = serializedObject.FindProperty("baseDamageValue");
         categoryProp = serializedObject.FindProperty("categoryValue");
         availableAttacksProp = serializedObject.FindProperty("availableAttacksValue");
+        dropEntriesProp = serializedObject.FindProperty("dropEntriesValue");
     }
 
     public override void OnInspectorGUI()
@@ -70,6 +72,11 @@ public class EnemyDataEditor : Editor
         if (availableAttacksProp != null)
         {
             EditorGUILayout.PropertyField(availableAttacksProp, new GUIContent("Available Attacks"), true);
+        }
+
+        if (dropEntriesProp != null)
+        {
+            EditorGUILayout.PropertyField(dropEntriesProp, new GUIContent("Drop Entries"), true);
         }
         
         EditorGUI.indentLevel--;
