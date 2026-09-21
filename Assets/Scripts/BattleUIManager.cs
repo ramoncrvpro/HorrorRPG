@@ -172,7 +172,6 @@ namespace HorrorRPG.Battle
             switch (phase)
             {
                 case BattlePhase.Entering:
-                    InitializeBattle();
                     HideAllMenus();
                     break;
                 case BattlePhase.PlayerChoice:

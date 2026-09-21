@@ -86,6 +86,7 @@ namespace HorrorRPG.Inventory
         /// <summary>Opens the inventory and resets selection to the consumables tab.</summary>
         public void Open()
         {
+            CloseConfirmation(false);
             tabIndex = 0;
             selectedIndex = -1;
             if (inventoryCanvas != null) inventoryCanvas.SetActive(true);
@@ -234,10 +235,10 @@ namespace HorrorRPG.Inventory
 
         private void CloseConfirmation(bool notify)
         {
-            if (!confirmationOpen) return;
+            bool wasOpen = confirmationOpen;
             confirmationOpen = false;
             discardConfirmationMenu?.Hide();
-            if (notify) ConfirmationClosed?.Invoke();
+            if (notify && wasOpen) ConfirmationClosed?.Invoke();
         }
     }
 }

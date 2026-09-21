@@ -194,6 +194,7 @@ MonoBehaviour:
   projectileManager: {fileID: 1224635720484144920}
   battlePlayerEffects: {fileID: 0}
   transitionEffects: {fileID: 0}
+  dropView: {fileID: 0}
   currentEnemyData: {fileID: 0}
   enemyDeathDelay: 1.5
 --- !u!114 &800334300663151331
