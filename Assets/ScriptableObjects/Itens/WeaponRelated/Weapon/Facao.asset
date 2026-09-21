@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f196add1cd67f25429edd44fae9f70ea, type: 3}
-  m_Name: Faca
+  m_Name: Facao
   m_EditorClassIdentifier: 
-  stableId: 298366c7139f46a6b5bd87206a973dc6
-  itemNameValue: Faca
-  descriptionValue: Arma corpo-a-corpo eficaz contra zumbis. Uso infinito.
+  stableId: a1f6c2d84b9140b5a2e7d6f8c9b0a123
+  itemNameValue: "Fac\xE3o"
+  descriptionValue: "Fac\xE3o pesado eficaz contra zumbis. Uso infinito."
   iconValue: {fileID: 21300000, guid: 4b9b64f46a21e384097b280a4c50923c, type: 3}
   categoryValue: 1
   maxStackSizeValue: 1
   disposableValue: 0
-  baseDamageValue: 15
+  baseDamageValue: 20
   effectiveAgainstValue: 3
   effectivenessMultiplierValue: 2
   maxLevelValue: 5

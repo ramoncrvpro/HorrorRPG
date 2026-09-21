@@ -50,7 +50,11 @@ namespace HorrorRPG.Interaction
         }
 
         /// <summary>Returns whether this item has a valid definition and remaining quantity.</summary>
-        public bool CanInteract(in InteractionContext context) => canBePickedUp && itemData != null && quantity > 0;
+        public bool CanInteract(in InteractionContext context)
+        {
+            if (!canBePickedUp || itemData == null || quantity <= 0) return false;
+            return context.Inventory.GetQuantity(itemData) < context.Inventory.GetMaximumQuantity(itemData);
+        }
 
         private void OnValidate()
         {

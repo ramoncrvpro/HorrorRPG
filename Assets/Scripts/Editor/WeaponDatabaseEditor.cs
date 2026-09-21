@@ -99,11 +99,8 @@ public class WeaponDatabaseEditor : Editor
         
         EditorGUILayout.HelpBox($"Total de armas: {allWeapons.Count}", MessageType.Info);
         
-        int basicWeapons = allWeapons.Count(w => !w.requiresAmmo);
-        int limitedWeapons = allWeapons.Count(w => w.requiresAmmo);
-        
-        EditorGUILayout.LabelField("Armas Básicas:", basicWeapons.ToString());
-        EditorGUILayout.LabelField("Armas com Munição:", limitedWeapons.ToString());
+        EditorGUILayout.LabelField("Weapon Levels:", allWeapons.Count(w => w.maxLevel > 0).ToString());
+        EditorGUILayout.LabelField("Max configured level:", allWeapons.Count == 0 ? "0" : allWeapons.Max(w => w.maxLevel).ToString());
     }
 }
 

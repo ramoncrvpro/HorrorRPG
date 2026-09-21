@@ -109,17 +109,12 @@ namespace HorrorRPG.Battle
             return Accept();
         }
 
-        /// <summary>Validates weapon ownership and ammunition before timing starts.</summary>
+        /// <summary>Validates weapon ownership before timing starts.</summary>
         public BattleCommandResult SelectWeapon(WeaponData weapon)
         {
             if (!RequirePhase(BattlePhase.PlayerChoice)) return Reject("A weapon can only be selected during player choice.");
             if (weapon == null) return Reject("Weapon is required.");
             if (!inventory.HasItem(weapon, 1)) return Reject("Weapon is not available in the inventory.");
-            if (weapon.requiresAmmo)
-            {
-                if (weapon.ammoType == null || !inventory.HasItem(weapon.ammoType, 1)) return Reject("Weapon has no ammunition.");
-                if (!inventory.RemoveItem(weapon.ammoType, 1).IsComplete) return Reject("Weapon ammunition could not be consumed.");
-            }
 
             session.RecentWeapons.Add(GetStableItemId(weapon));
             State.PendingWeapon = weapon;
@@ -134,9 +129,11 @@ namespace HorrorRPG.Battle
             if (State.PendingWeapon == null) return Reject("No pending weapon is selected.");
 
             WeaponData weapon = State.PendingWeapon;
+            int level = inventory.GetQuantity(weapon);
+            if (level < 1) return Reject("Weapon is no longer available in the inventory.");
             State.LastAttackResult = result;
             SetPhase(BattlePhase.ResolvingPlayerAttack);
-            int damage = Math.Max(0, weapon.GetDamageByResult(result, State.Enemy.category) + State.DamageModifier);
+            int damage = Math.Max(0, weapon.GetDamageByResult(result, State.Enemy.category, level) + State.DamageModifier);
             State.DamageModifier = 0;
             State.TimingSpeedModifier = 1f;
             State.PendingWeapon = null;

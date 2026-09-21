@@ -205,7 +205,7 @@ PrefabInstance:
     - target: {fileID: 652378816764311128, guid: d52880c7a0a358a4e9c81e9cd4e89dcd, type: 3}
       propertyPath: defaultWeapon
       value: 
-      objectReference: {fileID: 11400000, guid: f661ef6f770951740b2364fff936f008, type: 2}
+      objectReference: {fileID: 11400000, guid: 4c2b8ceaa82581146af4b4290feed5dc, type: 2}
     - target: {fileID: 1098245082168230412, guid: d52880c7a0a358a4e9c81e9cd4e89dcd, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0

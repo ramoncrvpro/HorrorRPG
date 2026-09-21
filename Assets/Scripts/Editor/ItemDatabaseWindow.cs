@@ -22,7 +22,6 @@ public class ItemDatabaseWindow : EditorWindow
         All,
         Items,
         Weapons,
-        Ammo,
         Consumables,
         Keys
     }
@@ -158,7 +157,7 @@ public class ItemDatabaseWindow : EditorWindow
     {
         if (item is WeaponData weapon)
         {
-            return weapon.requiresAmmo ? "Weapon (Ammo)" : "Weapon (Basic)";
+            return "Weapon (Infinite Levels)";
         }
         return $"Item ({item.category})";
     }
@@ -197,9 +196,6 @@ public class ItemDatabaseWindow : EditorWindow
         {
             if (weapon.baseDamage <= 0)
                 problemList.Add("Invalid damage");
-            
-            if (weapon.requiresAmmo && weapon.ammoType == null)
-                problemList.Add("Missing ammo type");
             
             if (weapon.effectiveAgainst == EnemyType.None && weapon.effectivenessMultiplier != 1f)
                 problemList.Add("Multiplier has no effect");
@@ -291,17 +287,10 @@ public class ItemDatabaseWindow : EditorWindow
         }
         
         EditorGUILayout.Space(5);
-        EditorGUILayout.LabelField("Type:", EditorStyles.miniLabel);
-        EditorGUILayout.LabelField(weapon.requiresAmmo ? "LIMITED (Uses Ammo)" : "BASIC (Unlimited)");
+        EditorGUILayout.LabelField("Max Level:", weapon.maxLevel.ToString());
+        EditorGUILayout.LabelField("Damage Bonus / Level:", $"{weapon.damageBonusPerLevel:P0}");
         
-        if (weapon.requiresAmmo)
-        {
-            EditorGUILayout.Space(5);
-            EditorGUILayout.LabelField("Ammo Type:", EditorStyles.miniLabel);
-            EditorGUILayout.LabelField(weapon.ammoType != null ? weapon.ammoType.itemName : "NOT SET");
-        }
-        
-        EditorGUILayout.Space(10);
+        EditorGUILayout.Space(5);
         EditorGUILayout.LabelField("Damage Preview:", EditorStyles.boldLabel);
         EditorGUILayout.LabelField($"vs None: {weapon.GetEffectiveDamage(EnemyType.None)}");
         EditorGUILayout.LabelField($"vs Demon: {weapon.GetEffectiveDamage(EnemyType.Demon)}");
@@ -315,12 +304,10 @@ public class ItemDatabaseWindow : EditorWindow
         
         List<ItemData> allItems = GetAllItems();
         int weaponCount = allItems.OfType<WeaponData>().Count();
-        int basicWeaponCount = allItems.OfType<WeaponData>().Count(w => !w.requiresAmmo);
-        int limitedWeaponCount = allItems.OfType<WeaponData>().Count(w => w.requiresAmmo);
         int consumableCount = allItems.Count(i => !(i is WeaponData) && i.category == ItemCategory.Consumable);
         int keyCount = allItems.Count(i => !(i is WeaponData) && i.category == ItemCategory.Key);
         
-        EditorGUILayout.LabelField($"Total: {allItems.Count} | Weapons: {weaponCount} (Basic: {basicWeaponCount}, Limited: {limitedWeaponCount}) | Consumables: {consumableCount} | Keys: {keyCount}", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField($"Total: {allItems.Count} | Weapons: {weaponCount} (Infinite Levels) | Consumables: {consumableCount} | Keys: {keyCount}", EditorStyles.miniLabel);
         
         GUILayout.FlexibleSpace();
         
@@ -375,9 +362,6 @@ public class ItemDatabaseWindow : EditorWindow
         {
             case FilterType.Weapons:
                 items = items.OfType<WeaponData>().Cast<ItemData>().ToList();
-                break;
-            case FilterType.Ammo:
-                items = items.OfType<WeaponData>().Where(w => w.requiresAmmo).Cast<ItemData>().ToList();
                 break;
             case FilterType.Consumables:
                 items = items.Where(i => !(i is WeaponData) && i.category == ItemCategory.Consumable).ToList();

@@ -245,11 +245,6 @@ public class WeaponEffectivenessMatrixWindow : EditorWindow
     {
         List<string> notes = new List<string>();
         
-        if (weapon.requiresAmmo)
-        {
-            notes.Add("Ammo Required");
-        }
-        
         if (weapon.effectiveAgainst == EnemyType.None)
         {
             notes.Add("No Effectiveness");
@@ -388,7 +383,7 @@ public class WeaponEffectivenessMatrixWindow : EditorWindow
         
         StringBuilder csv = new StringBuilder();
         
-        csv.Append("Weapon,Demon,Ghost,Zombie,Effective Against,Multiplier,Type\n");
+        csv.Append("Weapon,Demon,Ghost,Zombie,Effective Against,Multiplier,Max Level,Damage Bonus Per Level,Type\n");
         
         foreach (var weapon in weapons)
         {
@@ -398,7 +393,9 @@ public class WeaponEffectivenessMatrixWindow : EditorWindow
             csv.Append($"{weapon.GetEffectiveDamage(EnemyType.Zombie)},");
             csv.Append($"{weapon.effectiveAgainst},");
             csv.Append($"{weapon.effectivenessMultiplier},");
-            csv.Append($"{(weapon.requiresAmmo ? "LIMITED" : "BASIC")}\n");
+            csv.Append($"{weapon.maxLevel},");
+            csv.Append($"{weapon.damageBonusPerLevel},");
+            csv.Append("INFINITE\n");
         }
         
         System.IO.File.WriteAllText(path, csv.ToString());

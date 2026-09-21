@@ -2027,7 +2027,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7294bcb954c72164cae7c3041dfa8fe4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  itemData: {fileID: 11400000, guid: f661ef6f770951740b2364fff936f008, type: 2}
+  itemData: {fileID: 11400000, guid: 4c2b8ceaa82581146af4b4290feed5dc, type: 2}
   quantity: 1
   worldObjectId: {fileID: 499970059}
   canBePickedUp: 1
@@ -2450,6 +2450,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Essentials
       objectReference: {fileID: 0}
+    - target: {fileID: 6429488345385113167, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
+      propertyPath: defaultWeapon
+      value: 
+      objectReference: {fileID: 11400000, guid: 4c2b8ceaa82581146af4b4290feed5dc, type: 2}
     - target: {fileID: 7890436061723012767, guid: 8c9aa8fbd044ae44d9d281f87adb622c, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0

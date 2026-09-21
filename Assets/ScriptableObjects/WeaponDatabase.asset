@@ -13,8 +13,14 @@ MonoBehaviour:
   m_Name: WeaponDatabase
   m_EditorClassIdentifier: 
   weapons:
-  - {fileID: 11400000, guid: d19861beb7009a041a6772db3c8d4e45, type: 2}
-  - {fileID: 11400000, guid: f661ef6f770951740b2364fff936f008, type: 2}
+  - {fileID: 11400000, guid: 79cd9bdbf8ad488419fd9de170d85042, type: 2}
+  - {fileID: 11400000, guid: d5a97cf754679454a8869b7067eb8ec3, type: 2}
+  - {fileID: 11400000, guid: 40736f72c6bf2184a91a94deba844f56, type: 2}
+  - {fileID: 11400000, guid: 4c2b8ceaa82581146af4b4290feed5dc, type: 2}
+  - {fileID: 11400000, guid: b5cbc4df1a454dd44a09aa258f5febb8, type: 2}
+  - {fileID: 11400000, guid: 21517403365b20745ac21bab1f5aeee3, type: 2}
+  - {fileID: 11400000, guid: c62821af9b0fcc44aa178b17ff1546b1, type: 2}
   - {fileID: 11400000, guid: 40dc0e046d0ba6f47b309779fedb0fb8, type: 2}
-  - {fileID: 11400000, guid: c2cc174fddf472a4b96b382c794e623e, type: 2}
+  - {fileID: 11400000, guid: dd1a791ac509d7b4ba124b5f0ed04bca, type: 2}
+  - {fileID: 11400000, guid: 3e1d6b357ddfef44988b7ffcef3bc59e, type: 2}
   - {fileID: 11400000, guid: 3b35368f69904dc47910195e9f19f410, type: 2}

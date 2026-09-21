@@ -7,8 +7,7 @@ using UnityEngine;
 public enum WeaponCategory
 {
     Used,
-    Basic,
-    Limited
+    All
 }
 
 public class WeaponTab : BaseTab

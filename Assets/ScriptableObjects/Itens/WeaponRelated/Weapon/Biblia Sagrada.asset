@@ -12,13 +12,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f196add1cd67f25429edd44fae9f70ea, type: 3}
   m_Name: Biblia Sagrada
   m_EditorClassIdentifier: 
-  itemName: "B\xEDblia Sagrada"
-  description: "Livro sagrado devastador contra dem\xF4nios. Consome folhas sagradas"
-  icon: {fileID: 21300000, guid: 4b9b64f46a21e384097b280a4c50923c, type: 3}
-  category: 1
-  maxStackSize: 1
-  disposable: 0
-  baseDamage: 40
-  effectiveAgainst: 1
-  effectivenessMultiplier: 2
-  ammoType: {fileID: 11400000, guid: db432975228bd264aadbd567601f45be, type: 2}
+  stableId: 5c27b3d9e1f4608ac2b4e8f0a6d31597
+  itemNameValue: "B\xEDblia Sagrada"
+  descriptionValue: "Defini\xE7\xE3o legada preservada fora do banco ativo."
+  iconValue: {fileID: 21300000, guid: 4b9b64f46a21e384097b280a4c50923c, type: 3}
+  categoryValue: 1
+  maxStackSizeValue: 1
+  disposableValue: 0
+  baseDamageValue: 40
+  effectiveAgainstValue: 1
+  effectivenessMultiplierValue: 2
+  maxLevelValue: 5
+  damageBonusPerLevelValue: 0.2
+  markerSpeedValue: 2
+  criticalZoneCenterValue: 0.5
+  criticalZoneWidthValue: 0.05
+  hitZoneWidthValue: 0.4
+  criticalMultiplierValue: 1.5

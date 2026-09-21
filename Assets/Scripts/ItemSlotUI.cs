@@ -1,3 +1,5 @@
+using HorrorRPG.Battle;
+
 using System;
 using TMPro;
 using UnityEngine;
@@ -40,7 +42,8 @@ namespace HorrorRPG.Inventory
                 return;
             }
             if (itemNameText != null) itemNameText.text = entry.Item.itemName;
-            if (itemAmountText != null) itemAmountText.text = $"x{entry.Quantity}";
+            if (itemAmountText != null)
+                itemAmountText.text = entry.Item is WeaponData ? $"LVL{entry.Quantity}" : $"x{entry.Quantity}";
             gameObject.SetActive(true);
         }
 

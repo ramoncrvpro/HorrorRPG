@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using HorrorRPG.Core;
+using HorrorRPG.Battle;
+
 
 namespace HorrorRPG.Inventory
 {
@@ -74,7 +76,7 @@ namespace HorrorRPG.Inventory
             if (current == 0 && item.category == ItemCategory.Consumable && GetUsedConsumableSlots() >= MaximumConsumableSlots)
                 return Rejected(quantity, InventoryOperationReason.ConsumableSlotLimit);
 
-            int capacity = Math.Max(0, item.maxStackSize - current);
+            int capacity = Math.Max(0, GetMaximumQuantity(item) - current);
             int processed = Math.Min(quantity, capacity);
             if (processed > 0)
             {
@@ -109,6 +111,14 @@ namespace HorrorRPG.Inventory
         {
             if (item == null) return 0;
             return session.Inventory.GetQuantity(Register(item));
+        }
+
+
+        /// <summary>Returns the maximum quantity permitted for an item, using weapon max level for weapons.</summary>
+        public int GetMaximumQuantity(ItemData item)
+        {
+            if (item == null) return 0;
+            return item is WeaponData weapon ? weapon.maxLevel : item.maxStackSize;
         }
 
         /// <summary>Returns immutable entries, optionally filtered by category.</summary>

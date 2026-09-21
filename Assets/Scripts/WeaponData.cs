@@ -14,8 +14,8 @@ namespace HorrorRPG.Battle
         [SerializeField, FormerlySerializedAs("baseDamage")] private int baseDamageValue = 10;
         [SerializeField, FormerlySerializedAs("effectiveAgainst")] private EnemyType effectiveAgainstValue = EnemyType.None;
         [SerializeField, FormerlySerializedAs("effectivenessMultiplier")] private float effectivenessMultiplierValue = 2f;
-        [Header("Ammo System")]
-        [SerializeField, FormerlySerializedAs("ammoType")] private ItemData ammoTypeValue;
+        [SerializeField] private int maxLevelValue = 5;
+        [SerializeField] private float damageBonusPerLevelValue = 0.20f;
         [Header("Timing Bar Settings")]
         [SerializeField, FormerlySerializedAs("markerSpeed"), Range(0.5f, 5f)] private float markerSpeedValue = 2f;
         [Header("Hit Zones (values from 0 to 1)")]
@@ -27,21 +27,28 @@ namespace HorrorRPG.Battle
         public int baseDamage => baseDamageValue;
         public EnemyType effectiveAgainst => effectiveAgainstValue;
         public float effectivenessMultiplier => effectivenessMultiplierValue;
-        public ItemData ammoType => ammoTypeValue;
+        public int maxLevel => maxLevelValue;
+        public float damageBonusPerLevel => damageBonusPerLevelValue;
         public float markerSpeed => markerSpeedValue;
         public float criticalZoneCenter => criticalZoneCenterValue;
         public float criticalZoneWidth => criticalZoneWidthValue;
         public float hitZoneWidth => hitZoneWidthValue;
         public float criticalMultiplier => criticalMultiplierValue;
-        public bool requiresAmmo => ammoTypeValue != null;
-        public bool IsDefaultWeapon => !requiresAmmo;
 
-        /// <summary>Returns damage after applying target effectiveness.</summary>
-        public int GetEffectiveDamage(EnemyType targetType)
+        /// <summary>Returns the configured base damage scaled linearly for the requested level.</summary>
+        public int GetBaseDamageAtLevel(int level)
         {
+            int clampedLevel = Mathf.Clamp(level, 1, maxLevelValue);
+            return Mathf.RoundToInt(baseDamageValue * (1f + damageBonusPerLevelValue * (clampedLevel - 1)));
+        }
+
+        /// <summary>Returns damage after applying level scaling and target effectiveness.</summary>
+        public int GetEffectiveDamage(EnemyType targetType, int level = 1)
+        {
+            int levelDamage = GetBaseDamageAtLevel(level);
             return targetType == effectiveAgainstValue
-                ? Mathf.RoundToInt(baseDamageValue * effectivenessMultiplierValue)
-                : baseDamageValue;
+                ? Mathf.RoundToInt(levelDamage * effectivenessMultiplierValue)
+                : levelDamage;
         }
 
         /// <summary>Evaluates a normalized marker position against timing zones.</summary>
@@ -58,10 +65,10 @@ namespace HorrorRPG.Battle
             return AttackResult.Miss;
         }
 
-        /// <summary>Returns final damage for timing quality and target type.</summary>
-        public int GetDamageByResult(AttackResult result, EnemyType targetType)
+        /// <summary>Returns final damage for timing quality, level and target type.</summary>
+        public int GetDamageByResult(AttackResult result, EnemyType targetType, int level = 1)
         {
-            int effectiveDamage = GetEffectiveDamage(targetType);
+            int effectiveDamage = GetEffectiveDamage(targetType, level);
             return result switch
             {
                 AttackResult.Critical => Mathf.RoundToInt(effectiveDamage * criticalMultiplierValue),
@@ -76,13 +83,14 @@ namespace HorrorRPG.Battle
             base.OnValidate();
             baseDamageValue = Mathf.Max(1, baseDamageValue);
             effectivenessMultiplierValue = Mathf.Max(0f, effectivenessMultiplierValue);
+            maxLevelValue = Mathf.Max(1, maxLevelValue);
+            damageBonusPerLevelValue = Mathf.Max(0f, damageBonusPerLevelValue);
             markerSpeedValue = Mathf.Clamp(markerSpeedValue, 0.5f, 5f);
             criticalZoneCenterValue = Mathf.Clamp01(criticalZoneCenterValue);
             float maximumCriticalWidth = Mathf.Max(0.01f, 2f * Mathf.Min(criticalZoneCenterValue, 1f - criticalZoneCenterValue));
             criticalZoneWidthValue = Mathf.Clamp(criticalZoneWidthValue, 0.01f, Mathf.Min(0.2f, maximumCriticalWidth));
             hitZoneWidthValue = Mathf.Clamp(hitZoneWidthValue, 0.1f, 0.5f);
             criticalMultiplierValue = Mathf.Clamp(criticalMultiplierValue, 1f, 3f);
-            if (ammoTypeValue == this) ammoTypeValue = null;
         }
     }
 }

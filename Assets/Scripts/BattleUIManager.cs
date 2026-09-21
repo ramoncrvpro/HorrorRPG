@@ -11,8 +11,8 @@ namespace HorrorRPG.Battle
     /// <summary>Presents battle state and forwards player menu intent without applying rules.</summary>
     public class BattleUIManager : MonoBehaviour, IGameContextReceiver
     {
-        private static readonly WeaponCategory[] WeaponCategories = { WeaponCategory.Used, WeaponCategory.Basic, WeaponCategory.Limited };
-        private static readonly string[] WeaponCategoryLabels = { "USED", "BASIC", "LIMITED" };
+        private static readonly WeaponCategory[] WeaponCategories = { WeaponCategory.Used, WeaponCategory.All };
+        private static readonly string[] WeaponCategoryLabels = { "USED", "ALL" };
 
         [Header("UI References")]
         [SerializeField] private GameObject battleMainMenuBackground;
@@ -153,8 +153,18 @@ namespace HorrorRPG.Battle
         private void ConfigureTabs()
         {
             if (weaponTabs == null) return;
-            for (int index = 0; index < weaponTabs.Length && index < WeaponCategories.Length; index++)
-                weaponTabs[index]?.Initialize(WeaponCategories[index], WeaponCategoryLabels[index]);
+            for (int index = 0; index < weaponTabs.Length; index++)
+            {
+                if (index < WeaponCategories.Length)
+                {
+                    weaponTabs[index]?.Initialize(WeaponCategories[index], WeaponCategoryLabels[index]);
+                    weaponTabs[index]?.gameObject.SetActive(true);
+                }
+                else
+                {
+                    weaponTabs[index]?.gameObject.SetActive(false);
+                }
+            }
         }
 
         private void HandlePhaseChanged(BattlePhase phase)
@@ -293,11 +303,7 @@ namespace HorrorRPG.Battle
             }
             else
             {
-                foreach (WeaponData weapon in allWeapons)
-                {
-                    if ((category == WeaponCategory.Basic && !weapon.requiresAmmo) || (category == WeaponCategory.Limited && weapon.requiresAmmo))
-                        visibleWeapons.Add(weapon);
-                }
+                foreach (WeaponData weapon in allWeapons) visibleWeapons.Add(weapon);
             }
 
             int slotCount = weaponSlots?.Length ?? 0;
@@ -306,10 +312,9 @@ namespace HorrorRPG.Battle
                 if (index < visibleWeapons.Count)
                 {
                     WeaponData weapon = visibleWeapons[index];
-                    int ammo = weapon.requiresAmmo && weapon.ammoType != null ? inventoryService.GetQuantity(weapon.ammoType) : -1;
-                    weaponSlots[index]?.Setup(weapon, ammo);
+                    weaponSlots[index]?.Setup(weapon, inventoryService.GetQuantity(weapon));
                 }
-                else weaponSlots[index]?.Setup(null);
+                else weaponSlots[index]?.Setup(null, 0);
             }
             emptyMessage?.SetActive(visibleWeapons.Count == 0);
             UpdateWeaponTabs();

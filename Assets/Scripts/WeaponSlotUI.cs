@@ -25,8 +25,8 @@ namespace HorrorRPG.Inventory
             SetSelected(false);
         }
 
-        /// <summary>Renders a weapon and optional ammunition count.</summary>
-        public void Setup(WeaponData weapon, int ammoCount = -1)
+        /// <summary>Renders a weapon and its current level.</summary>
+        public void Setup(WeaponData weapon, int level)
         {
             currentWeapon = weapon;
             SetSelected(false);
@@ -35,8 +35,9 @@ namespace HorrorRPG.Inventory
                 gameObject.SetActive(false);
                 return;
             }
+            int visibleLevel = Mathf.Clamp(level, 1, weapon.maxLevel);
             if (itemNameText != null) itemNameText.text = weapon.itemName;
-            if (itemAmountText != null) itemAmountText.text = ammoCount >= 0 ? $"x{ammoCount}" : string.Empty;
+            if (itemAmountText != null) itemAmountText.text = $"LVL{visibleLevel}";
             gameObject.SetActive(true);
         }
 
